@@ -33,7 +33,7 @@ class ApiClient {
   // Auth Methods
   static Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/auth/login'),
+      Uri.parse('$baseUrl/users/login'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'password': password}),
     );
@@ -42,7 +42,7 @@ class ApiClient {
 
   static Future<void> sendOtp(String phone) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/auth/send-otp'),
+      Uri.parse('$baseUrl/users/send-otp'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'phone': phone}),
     );
@@ -58,7 +58,7 @@ class ApiClient {
     String? otp,
   }) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/auth/register'),
+      Uri.parse('$baseUrl/users/register'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'name': name,
@@ -74,7 +74,7 @@ class ApiClient {
 
   static Future<void> resetPassword(String phone, String otp, String newPassword) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/auth/reset-password'),
+      Uri.parse('$baseUrl/users/reset-password'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'phone': phone,
@@ -124,7 +124,7 @@ class ApiClient {
 
   static Future<void> requestDeliveryOtp(String shipmentId) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/shipments/$shipmentId/request-otp'),
+      Uri.parse('$baseUrl/shipments/$shipmentId/otp'),
       headers: await _getHeaders(),
     );
     _handleResponse(response);
@@ -132,7 +132,7 @@ class ApiClient {
 
   static Future<void> completeDeliveryWithOtp(String shipmentId, String otp) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/shipments/$shipmentId/complete-otp'),
+      Uri.parse('$baseUrl/shipments/$shipmentId/complete'),
       headers: await _getHeaders(),
       body: jsonEncode({'otp': otp}),
     );
