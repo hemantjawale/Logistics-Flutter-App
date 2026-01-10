@@ -42,16 +42,22 @@ const shipmentSchema = new mongoose.Schema(
     price: { type: Number },
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     pickupLocation: {
-      lat: { type: Number },
-      lng: { type: Number },
+      type: { type: String, enum: ['Point'], default: 'Point' },
+      coordinates: { type: [Number], default: [0, 0] }, // [lng, lat]
+      address: { type: String }
     },
     dropoffLocation: {
-      lat: { type: Number },
-      lng: { type: Number },
+      type: { type: String, enum: ['Point'], default: 'Point' },
+      coordinates: { type: [Number], default: [0, 0] }, // [lng, lat]
+      address: { type: String }
     },
   },
   { timestamps: true }
 );
+
+// Index for geospatial queries if needed
+shipmentSchema.index({ pickupLocation: '2dsphere' });
+shipmentSchema.index({ dropoffLocation: '2dsphere' });
 
 const vehicleSchema = new mongoose.Schema(
   {

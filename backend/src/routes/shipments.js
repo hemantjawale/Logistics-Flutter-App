@@ -17,7 +17,7 @@ router.post('/', async (req, res) => {
     }
 
     // Auto-Assign Driver Logic
-    if (data.autoAssignDriver) {
+    if (data.autoAssignDriver && !data.driverId) {
       // Find first available driver (Mock logic: just find any driver)
       const driver = await User.findOne({ role: 'driver' });
       if (driver) {
@@ -31,6 +31,15 @@ router.post('/', async (req, res) => {
        if (driver) {
          data.driverName = driver.name;
        }
+    }
+    
+    // Handle coordinates if provided in simplified format
+    if (data.destinationLat && data.destinationLng) {
+        data.dropoffLocation = {
+            type: 'Point',
+            coordinates: [data.destinationLng, data.destinationLat],
+            address: data.destination
+        };
     }
 
     const shipment = await Shipment.create(data);
