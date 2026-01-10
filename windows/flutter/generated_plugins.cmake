@@ -3,6 +3,8 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  battery_plus
+  geolocator_windows
   printing
   url_launcher_windows
 )

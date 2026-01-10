@@ -19,7 +19,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
   @override
   void initState() {
     super.initState();
-    _initDriver();
+    _loadJobs();
     // Start background tracking when driver opens dashboard
     BackgroundService.startTracking();
   }
@@ -55,6 +55,20 @@ class _DriverDashboardState extends State<DriverDashboard> {
       }
     } catch (e) {
        // Handle error
+    }
+  }
+
+  Future<void> _completeJob(String shipmentId) async {
+    try {
+      await ApiClient.updateShipment(shipmentId, {'status': 'Delivered'});
+      _loadJobs();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Job Completed!')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 
@@ -105,8 +119,17 @@ class _DriverDashboardState extends State<DriverDashboard> {
                                   icon: const Icon(Icons.play_arrow),
                                   label: const Text('Start Job'),
                                 ),
+                              )
+                            else
+                              Expanded(
+                                child: FilledButton.icon(
+                                  onPressed: () => _completeJob(job['_id']),
+                                  icon: const Icon(Icons.check),
+                                  label: const Text('Complete Job'),
+                                  style: FilledButton.styleFrom(backgroundColor: Colors.green),
+                                ),
                               ),
-                            if (!isStarted) const SizedBox(width: 8),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: OutlinedButton.icon(
                                 onPressed: () => _launchMap(job['destination']),
