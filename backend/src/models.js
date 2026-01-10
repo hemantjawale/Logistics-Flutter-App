@@ -28,9 +28,27 @@ const shipmentSchema = new mongoose.Schema(
     eta: { type: Date },
     route: { type: String },
     driverName: { type: String },
+    driverId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     vehicleId: { type: String },
     priority: { type: String, enum: ['Low', 'Normal', 'High', 'Critical'], default: 'Normal' },
     progress: { type: Number, min: 0, max: 1, default: 0 },
+    // New fields
+    weight: { type: Number }, // in kg
+    dimensions: {
+      length: { type: Number },
+      width: { type: Number },
+      height: { type: Number },
+    },
+    price: { type: Number },
+    customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    pickupLocation: {
+      lat: { type: Number },
+      lng: { type: Number },
+    },
+    dropoffLocation: {
+      lat: { type: Number },
+      lng: { type: Number },
+    },
   },
   { timestamps: true }
 );
@@ -67,6 +85,7 @@ const paymentSchema = new mongoose.Schema(
     method: { type: String, enum: ['UPI', 'NEFT', 'Card', 'Cash'], default: 'UPI' },
     dueDate: { type: Date },
     paidAt: { type: Date },
+    shipmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Shipment' },
   },
   { timestamps: true }
 );

@@ -67,8 +67,11 @@ class ApiClient {
 
   // Shipments CRUD -----------------------------------------------------------
 
-  static Future<List<Map<String, dynamic>>> fetchShipments({String? status}) {
-    final query = status != null && status != 'All' ? '?status=$status' : '';
+  static Future<List<Map<String, dynamic>>> fetchShipments({String? status, String? driverId}) {
+    String query = '?';
+    if (status != null && status != 'All') query += 'status=$status&';
+    if (driverId != null) query += 'driverId=$driverId&';
+    
     return _getList('/shipments$query');
   }
 
@@ -101,22 +104,14 @@ class ApiClient {
     return _send('POST', '/fleet', vehicle);
   }
 
-  static Future<Map<String, dynamic>> updateVehicle(
-    String id,
-    Map<String, dynamic> vehicle,
-  ) {
-    return _send('PUT', '/fleet/$id', vehicle);
-  }
-
   static Future<void> deleteVehicle(String id) {
     return _delete('/fleet/$id');
   }
 
   // Payments CRUD ------------------------------------------------------------
 
-  static Future<List<Map<String, dynamic>>> fetchPayments({String? status}) {
-    final query = status != null && status != 'All' ? '?status=$status' : '';
-    return _getList('/payments$query');
+  static Future<List<Map<String, dynamic>>> fetchPayments() {
+    return _getList('/payments');
   }
 
   static Future<Map<String, dynamic>> createPayment(
@@ -125,45 +120,19 @@ class ApiClient {
     return _send('POST', '/payments', payment);
   }
 
-  static Future<Map<String, dynamic>> updatePayment(
-    String id,
-    Map<String, dynamic> payment,
-  ) {
-    return _send('PUT', '/payments/$id', payment);
-  }
-
   static Future<void> deletePayment(String id) {
     return _delete('/payments/$id');
   }
-
-  // Analytics -----------------------------------------------------------------
-
+  
+  // Analytics ----------------------------------------------------------------
+  
   static Future<Map<String, dynamic>> fetchSummaryAnalytics() {
     return _get('/analytics/summary');
   }
 
-  // Users / Auth --------------------------------------------------------------
+  // Users / Drivers ----------------------------------------------------------
 
-  static Future<Map<String, dynamic>> login(String email, String password) {
-    return _send('POST', '/users/login', {
-      'email': email,
-      'password': password,
-    });
-  }
-
-  static Future<Map<String, dynamic>> register(
-    String name,
-    String email,
-    String password,
-    String role, {
-    String? phone,
-  }) {
-    return _send('POST', '/users/register', {
-      'name': name,
-      'email': email,
-      'password': password,
-      'role': role,
-      if (phone != null) 'phone': phone,
-    });
+  static Future<List<Map<String, dynamic>>> fetchDrivers() {
+    return _getList('/users/drivers');
   }
 }

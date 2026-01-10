@@ -43,6 +43,17 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// GET DRIVERS (New Endpoint)
+router.get('/drivers', async (req, res) => {
+  try {
+    const drivers = await User.find({ role: 'driver' }).select('name email phone status');
+    res.json(drivers);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch drivers' });
+  }
+});
+
 // READ all users
 router.get('/', async (req, res) => {
   try {

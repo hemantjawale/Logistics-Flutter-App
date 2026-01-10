@@ -1,12 +1,39 @@
 import express from 'express';
-import { Shipment } from '../models.js';
+import { Shipment, User } from '../models.js';
 
 const router = express.Router();
 
 // CREATE shipment
 router.post('/', async (req, res) => {
   try {
-    const shipment = await Shipment.create(req.body);
+    const data = req.body;
+    
+    // Dynamic Price Calculation Logic (Simple Mock)
+    // Price = (Weight * 10) + (Volume * 5) + Base Fee
+    if (data.weight && !data.price) {
+      const volume = (data.dimensions?.length || 0) * (data.dimensions?.width || 0) * (data.dimensions?.height || 0);
+      data.price = (data.weight * 10) + (volume * 0.005) + 500; // Base fee 500
+      data.price = Math.round(data.price * 100) / 100; // Round to 2 decimals
+    }
+
+    // Auto-Assign Driver Logic
+    if (data.autoAssignDriver) {
+      // Find first available driver (Mock logic: just find any driver)
+      const driver = await User.findOne({ role: 'driver' });
+      if (driver) {
+        data.driverId = driver._id;
+        data.driverName = driver.name;
+        data.status = 'Pending'; // Driver needs to accept? For now, just assign.
+      }
+    } else if (data.driverId) {
+       // Manual assignment
+       const driver = await User.findById(data.driverId);
+       if (driver) {
+         data.driverName = driver.name;
+       }
+    }
+
+    const shipment = await Shipment.create(data);
     res.status(201).json(shipment);
   } catch (err) {
     console.error(err);
@@ -17,9 +44,11 @@ router.post('/', async (req, res) => {
 // READ all shipments (with optional status filter)
 router.get('/', async (req, res) => {
   try {
-    const { status } = req.query;
+    const { status, driverId, customerId } = req.query;
     const query = {};
     if (status) query.status = status;
+    if (driverId) query.driverId = driverId;
+    if (customerId) query.customerId = customerId;
 
     const shipments = await Shipment.find(query).sort({ createdAt: -1 });
     res.json(shipments);
