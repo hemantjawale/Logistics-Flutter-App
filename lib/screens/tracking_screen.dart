@@ -82,6 +82,20 @@ class TrackingScreen extends StatelessWidget {
                         eta > 0 ? '$eta Minutes' : 'Arrived / Unknown',
                         style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                       ),
+                      const SizedBox(height: 4),
+                      // Last Seen / Offline Handling
+                      Row(
+                        children: [
+                          Icon(Icons.circle, size: 10, color: (shipment['lastUpdated'] != null && DateTime.now().difference(DateTime.parse(shipment['lastUpdated'])).inMinutes < 15) ? Colors.green : Colors.red),
+                          const SizedBox(width: 6),
+                          Text(
+                            (shipment['lastUpdated'] != null && DateTime.now().difference(DateTime.parse(shipment['lastUpdated'])).inMinutes > 15) 
+                              ? 'Driver Offline (Last seen ${DateTime.now().difference(DateTime.parse(shipment['lastUpdated'])).inMinutes}m ago)' 
+                              : 'Driver Online',
+                            style: const TextStyle(color: Colors.white54, fontSize: 12),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ],

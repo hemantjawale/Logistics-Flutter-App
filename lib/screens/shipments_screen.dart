@@ -256,10 +256,13 @@ class _ShipmentsScreenState extends State<ShipmentsScreen> {
           const SizedBox(width: 16),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _createShipment,
-        backgroundColor: const Color(0xFF4F46E5),
-        child: const Icon(Icons.add, color: Colors.white),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 80),
+        child: FloatingActionButton(
+          onPressed: _createShipment,
+          backgroundColor: const Color(0xFF4F46E5),
+          child: const Icon(Icons.add, color: Colors.white),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: () async => _refresh(),

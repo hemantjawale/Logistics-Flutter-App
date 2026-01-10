@@ -1,9 +1,47 @@
 import express from 'express';
 import { Payment } from '../models.js';
+import { createOrder, verifyPaymentSignature } from '../utils/razorpayService.js';
 
 const router = express.Router();
 
-// CREATE payment
+// CREATE Razorpay Order
+router.post('/create-order', async (req, res) => {
+  try {
+    const { amount, currency, receipt } = req.body;
+    const order = await createOrder(amount, currency, receipt);
+    res.json(order);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create Razorpay order' });
+  }
+});
+
+// VERIFY Razorpay Payment
+router.post('/verify-payment', async (req, res) => {
+  try {
+    const { orderId, paymentId, signature, paymentData } = req.body;
+    const isValid = verifyPaymentSignature(orderId, paymentId, signature);
+    
+    if (isValid) {
+        // Create or update payment record
+        if (paymentData) {
+            await Payment.create({
+                ...paymentData,
+                status: 'Paid',
+                method: 'Online',
+                paidAt: new Date()
+            });
+        }
+        res.json({ success: true });
+    } else {
+        res.status(400).json({ error: 'Invalid signature' });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Verification failed' });
+  }
+});
+
+// CREATE payment (Manual)
 router.post('/', async (req, res) => {
   try {
     const payment = await Payment.create(req.body);

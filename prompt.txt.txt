@@ -1,0 +1,56 @@
+lib/screens/payments_screen.dart:192:21: Error: Can't find ']' to match '['.
+          children: [
+                    ^
+lib/screens/payments_screen.dart:315:11: Error: Expected an identifier, but got ']'.
+Try inserting an identifier before ']'.
+          ],
+          ^
+lib/screens/payments_screen.dart:315:11: Error: Expected ')' before this.
+          ],
+          ^
+lib/screens/payments_screen.dart:188:21: Error: Too many positional arguments: 0 allowed, but 3 found.
+Try removing the extra positional arguments.
+      child: Padding(
+                    ^
+/C:/Flutter/src/flutter_windows_3.38.6-stable/flutter/packages/flutter/lib/src/widgets/basic.dart:2244:9: Context: Found this candidate, but the arguments don't match.
+  const Padding({super.key, required this.padding, super.child});
+        ^^^^^^^
+lib/screens/payments_screen.dart:317:7: Error: Expected ';' after this.
+      ),
+      ^
+lib/screens/payments_screen.dart:317:8: Error: Expected an identifier, but got ','.
+Try inserting an identifier before ','.
+      ),
+       ^
+lib/screens/payments_screen.dart:317:8: Error: Unexpected token ';'.
+      ),
+       ^
+lib/screens/payments_screen.dart:318:5: Error: Expected an identifier, but got ')'.
+Try inserting an identifier before ')'.
+    );
+    ^
+lib/screens/payments_screen.dart:317:8: Error: Expected ';' after this.
+      ),
+       ^
+lib/screens/payments_screen.dart:318:5: Error: Unexpected token ';'.
+    );
+    ^
+Target kernel_snapshot_program failed: Exception
+
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileFlutterBuildDebug'.
+> Process 'command 'C:\Flutter\src\flutter_windows_3.38.6-stable\flutter\bin\flutter.bat'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 9s
+Running Gradle task 'assembleDebug'...                             10.0s
+Error: Gradle task assembleDebug failed with exit code 1
+PS D:\hemantbharti>

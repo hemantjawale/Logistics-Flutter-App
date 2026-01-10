@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'screens/landing_page.dart';
 import 'screens/dashboard_screen.dart';
@@ -7,7 +8,15 @@ import 'screens/fleet_screen.dart';
 import 'screens/payments_screen.dart';
 import 'screens/analytics_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint("Error loading .env file: $e");
+    // Continue running the app even if .env fails to load, 
+    // though some features might not work.
+  }
   runApp(const LogisticsApp());
 }
 

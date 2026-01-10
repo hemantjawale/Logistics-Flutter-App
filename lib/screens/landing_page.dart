@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/api_client.dart';
 import '../main.dart'; // Import MainShell
+import 'otp_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
@@ -73,6 +75,16 @@ class LandingPage extends StatelessWidget {
                   ),
                   child: const Text('Register'),
                 ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                    );
+                  },
+                  child: const Text('Forgot Password?', style: TextStyle(color: Colors.white70)),
+                ),
               ],
             ),
           ),
@@ -117,23 +129,32 @@ class _AuthScreenState extends State<AuthScreen> {
           _emailController.text,
           _passwordController.text,
         );
+        _navToDashboard();
       } else {
-        await ApiClient.register(
-          _nameController.text,
-          _emailController.text,
-          _passwordController.text,
-          _role,
-          phone: _phoneController.text.isNotEmpty ? _phoneController.text : null,
-        );
-      }
-
-      if (mounted) {
-        // Navigate to Dashboard on success
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const MainShell()),
-          (route) => false,
-        );
+        // Registration Flow with OTP
+        if (_phoneController.text.isNotEmpty) {
+           await ApiClient.sendOtp(_phoneController.text);
+           if (mounted) {
+             Navigator.push(
+               context,
+               MaterialPageRoute(
+                 builder: (_) => OtpScreen(
+                   phone: _phoneController.text,
+                   onVerified: (otp) => _finishRegistration(otp),
+                 ),
+               ),
+             );
+           }
+        } else {
+          // If phone is mandatory, show error, otherwise register without phone
+           await ApiClient.register(
+            _nameController.text,
+            _emailController.text,
+            _passwordController.text,
+            _role,
+          );
+          _navToDashboard();
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -143,6 +164,38 @@ class _AuthScreenState extends State<AuthScreen> {
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _finishRegistration(String otp) async {
+    try {
+      await ApiClient.register(
+        _nameController.text,
+        _emailController.text,
+        _passwordController.text,
+        _role,
+        phone: _phoneController.text,
+        otp: otp,
+      );
+      if (mounted) {
+         // Pop OTP screen
+         Navigator.pop(context); 
+         _navToDashboard();
+      }
+    } catch (e) {
+      if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Registration Failed: $e')));
+      }
+    }
+  }
+
+  void _navToDashboard() {
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const MainShell()),
+        (route) => false,
+      );
     }
   }
 
@@ -197,8 +250,9 @@ class _AuthScreenState extends State<AuthScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _phoneController,
-                    decoration: const InputDecoration(labelText: 'Phone (Optional)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Phone', border: OutlineInputBorder()),
                     keyboardType: TextInputType.phone,
+                    validator: (v) => v!.isEmpty ? 'Required for OTP' : null,
                   ),
                   const SizedBox(height: 16),
                 ],

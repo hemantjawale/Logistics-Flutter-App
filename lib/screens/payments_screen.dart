@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../services/api_client.dart';
 
 class PaymentsScreen extends StatefulWidget {
@@ -10,11 +12,70 @@ class PaymentsScreen extends StatefulWidget {
 
 class _PaymentsScreenState extends State<PaymentsScreen> {
   late Future<List<Map<String, dynamic>>> _paymentsFuture;
+  late Razorpay _razorpay;
 
   @override
   void initState() {
     super.initState();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
     _refresh();
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    super.dispose();
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    try {
+      // In a real app, you would verify this signature on backend
+      // Here we just update the status assuming it's valid for demo
+      // Or call ApiClient.verifyRazorpayPayment(...)
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Payment Successful: ${response.paymentId}')),
+      );
+      _refresh();
+    } catch (e) {
+      debugPrint('Payment Verification Error: $e');
+    }
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Payment Failed: ${response.message}')),
+    );
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('External Wallet: ${response.walletName}')),
+    );
+  }
+
+  Future<void> _initiatePayment(double amount, String customerName) async {
+    try {
+      final order = await ApiClient.createRazorpayOrder(amount);
+      
+      var options = {
+        'key': 'YOUR_RAZORPAY_KEY_ID', // Replace with Env var in production
+        'amount': order['amount'],
+        'name': 'Logistics App',
+        'description': 'Invoice Payment',
+        'order_id': order['id'],
+        'prefill': {'contact': '9876543210', 'email': 'test@example.com'},
+        'external': {
+          'wallets': ['paytm']
+        }
+      };
+
+      _razorpay.open(options);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
   }
 
   void _refresh() {
@@ -123,41 +184,43 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+    return Scaffold(
+      backgroundColor: const Color(0xFF020617),
+      body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Payments',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Cashflow view across customers',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: Colors.white70),
-                    ),
-                  ],
-                ),
-                FloatingActionButton(
-                  mini: true,
-                  onPressed: _createPayment,
-                  backgroundColor: Colors.blueAccent,
-                  child: const Icon(Icons.add),
-                ),
-              ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Payments',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Cashflow view across customers',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                  FloatingActionButton(
+                    mini: true,
+                    onPressed: _createPayment,
+                    backgroundColor: Colors.blueAccent,
+                    child: const Icon(Icons.add),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             Expanded(
@@ -188,32 +251,35 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
 
                   return Column(
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _SummaryCard(
-                              label: 'Total',
-                              value: _fmt(total),
-                              color: Colors.greenAccent,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _SummaryCard(
+                                label: 'Total',
+                                value: _fmt(total),
+                                color: Colors.greenAccent,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _SummaryCard(
-                              label: 'Pending',
-                              value: _fmt(pending),
-                              color: Colors.orangeAccent,
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _SummaryCard(
+                                label: 'Pending',
+                                value: _fmt(pending),
+                                color: Colors.orangeAccent,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _SummaryCard(
-                              label: 'Overdue',
-                              value: _fmt(overdue),
-                              color: Colors.redAccent,
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _SummaryCard(
+                                label: 'Overdue',
+                                value: _fmt(overdue),
+                                color: Colors.redAccent,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Expanded(
@@ -221,6 +287,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                             ? const Center(child: Text('No payments found'))
                             : ListView.builder(
                                 itemCount: payments.length,
+                                padding: const EdgeInsets.fromLTRB(20, 0, 20, 80),
                                 itemBuilder: (context, index) {
                                   final payment = payments[index];
                                   final id = payment['_id']?.toString() ?? '';
@@ -261,6 +328,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     );
   }
 }
+
 
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({

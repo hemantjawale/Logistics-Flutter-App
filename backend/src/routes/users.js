@@ -1,15 +1,39 @@
 import express from 'express';
 import { User } from '../models.js';
+import { sendOtp, verifyOtp } from '../utils/otpService.js';
 
 const router = express.Router();
 
-// REGISTER (Create User)
+// REQUEST OTP (For Registration or Forgot Password)
+router.post('/send-otp', async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ error: 'Phone number required' });
+    
+    await sendOtp(phone);
+    res.json({ message: 'OTP sent successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to send OTP' });
+  }
+});
+
+// REGISTER (Create User with OTP Verification)
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, role, phone } = req.body;
+    const { name, email, password, role, phone, otp } = req.body;
     // Basic validation
     if (!name || !email || !password || !role) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    if (phone && otp) {
+      const isValid = verifyOtp(phone, otp);
+      if (!isValid) return res.status(400).json({ error: 'Invalid or expired OTP' });
+    } else if (phone) {
+        // If phone provided but no OTP, maybe enforce it? 
+        // For now, let's assume if phone is there, OTP is required.
+        return res.status(400).json({ error: 'OTP required for phone registration' });
     }
 
     // Check if user exists
@@ -23,6 +47,30 @@ router.post('/register', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(400).json({ error: 'Failed to register user', details: err.message });
+  }
+});
+
+// FORGOT PASSWORD - RESET
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { phone, otp, newPassword } = req.body;
+    if (!phone || !otp || !newPassword) {
+      return res.status(400).json({ error: 'Phone, OTP and New Password required' });
+    }
+
+    const isValid = verifyOtp(phone, otp);
+    if (!isValid) return res.status(400).json({ error: 'Invalid or expired OTP' });
+
+    const user = await User.findOne({ phone });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    user.password = newPassword; // In production, hash this!
+    await user.save();
+
+    res.json({ message: 'Password reset successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to reset password' });
   }
 });
 

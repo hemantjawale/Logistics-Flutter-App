@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Simple API client for the logistics backend.
 ///
@@ -9,25 +10,33 @@ class ApiClient {
   // For local emulator use: http://10.0.2.2:3000/api
   // For real device on same Wi-Fi use: http://<your_pc_ip>:3000/api
   // For Render deployment use: https://your-service.onrender.com/api
-  static String baseUrl = 'https://flutter-pnvo.onrender.com/api';
+  static String baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://flutter-pnvo.onrender.com/api';
 
   static Future<List<Map<String, dynamic>>> _getList(String path) async {
     final uri = Uri.parse('$baseUrl$path');
-    final res = await http.get(uri);
-    if (res.statusCode >= 200 && res.statusCode < 300) {
-      final List data = jsonDecode(res.body) as List;
-      return data.cast<Map<String, dynamic>>();
+    try {
+      final res = await http.get(uri).timeout(const Duration(seconds: 15));
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        final List data = jsonDecode(res.body) as List;
+        return data.cast<Map<String, dynamic>>();
+      }
+      throw Exception('GET $path failed: ${res.statusCode} ${res.body}');
+    } catch (e) {
+      throw Exception('Network error: $e');
     }
-    throw Exception('GET $path failed: ${res.statusCode} ${res.body}');
   }
 
   static Future<Map<String, dynamic>> _get(String path) async {
     final uri = Uri.parse('$baseUrl$path');
-    final res = await http.get(uri);
-    if (res.statusCode >= 200 && res.statusCode < 300) {
-      return jsonDecode(res.body) as Map<String, dynamic>;
+    try {
+      final res = await http.get(uri).timeout(const Duration(seconds: 15));
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        return jsonDecode(res.body) as Map<String, dynamic>;
+      }
+      throw Exception('GET $path failed: ${res.statusCode} ${res.body}');
+    } catch (e) {
+      throw Exception('Network error: $e');
     }
-    throw Exception('GET $path failed: ${res.statusCode} ${res.body}');
   }
 
   static Future<Map<String, dynamic>> _send(
@@ -40,21 +49,25 @@ class ApiClient {
     late http.Response res;
     final jsonBody = jsonEncode(body);
 
-    switch (method) {
-      case 'POST':
-        res = await http.post(uri, headers: headers, body: jsonBody);
-        break;
-      case 'PUT':
-        res = await http.put(uri, headers: headers, body: jsonBody);
-        break;
-      default:
-        throw ArgumentError('Unsupported method $method');
-    }
+    try {
+      switch (method) {
+        case 'POST':
+          res = await http.post(uri, headers: headers, body: jsonBody).timeout(const Duration(seconds: 15));
+          break;
+        case 'PUT':
+          res = await http.put(uri, headers: headers, body: jsonBody).timeout(const Duration(seconds: 15));
+          break;
+        default:
+          throw ArgumentError('Unsupported method $method');
+      }
 
-    if (res.statusCode >= 200 && res.statusCode < 300) {
-      return jsonDecode(res.body) as Map<String, dynamic>;
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        return jsonDecode(res.body) as Map<String, dynamic>;
+      }
+      throw Exception('Request failed: ${res.statusCode} ${res.body}');
+    } catch (e) {
+      throw Exception('Network error: $e');
     }
-    throw Exception('$method $path failed: ${res.statusCode} ${res.body}');
   }
 
   static Future<void> _delete(String path) async {
@@ -139,12 +152,28 @@ class ApiClient {
     });
   }
 
+  // OTP & Password -----------------------------------------------------------
+
+  static Future<void> sendOtp(String phone) async {
+    final res = await _send('POST', '/users/send-otp', {'phone': phone});
+    // Check message?
+  }
+
+  static Future<void> resetPassword(String phone, String otp, String newPassword) {
+    return _send('POST', '/users/reset-password', {
+      'phone': phone,
+      'otp': otp,
+      'newPassword': newPassword,
+    });
+  }
+  
   static Future<Map<String, dynamic>> register(
     String name,
     String email,
     String password,
     String role, {
     String? phone,
+    String? otp,
   }) {
     return _send('POST', '/users/register', {
       'name': name,
@@ -152,6 +181,31 @@ class ApiClient {
       'password': password,
       'role': role,
       if (phone != null) 'phone': phone,
+      if (otp != null) 'otp': otp,
+    });
+  }
+
+  // Razorpay -----------------------------------------------------------------
+
+  static Future<Map<String, dynamic>> createRazorpayOrder(double amount) {
+    return _send('POST', '/payments/create-order', {
+      'amount': amount,
+      'currency': 'INR',
+      'receipt': 'rcpt_${DateTime.now().millisecondsSinceEpoch}',
+    });
+  }
+
+  static Future<void> verifyRazorpayPayment(
+    String orderId,
+    String paymentId,
+    String signature,
+    Map<String, dynamic> paymentData,
+  ) {
+    return _send('POST', '/payments/verify-payment', {
+      'orderId': orderId,
+      'paymentId': paymentId,
+      'signature': signature,
+      'paymentData': paymentData,
     });
   }
 
