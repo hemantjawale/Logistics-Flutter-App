@@ -1,7 +1,23 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Configure dotenv to load from parent directory
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.join(__dirname, '../.env') });
+
+// Debug environment loading
+console.log('Current working directory:', process.cwd());
+console.log('Script directory:', __dirname);
+console.log('Env file path:', path.resolve(__dirname, '../.env'));
+console.log('Environment variables after dotenv config:');
+console.log('RAZORPAY_KEY_ID:', process.env.RAZORPAY_KEY_ID);
+console.log('RAZORPAY_KEY_SECRET:', process.env.RAZORPAY_KEY_SECRET);
+console.log('MONGO_URI:', process.env.MONGO_URI);
 
 import shipmentsRouter from './routes/shipments.js';
 import fleetRouter from './routes/fleet.js';
