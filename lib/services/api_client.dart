@@ -221,6 +221,20 @@ class ApiClient {
     });
   }
 
+  static Future<Map<String, dynamic>> verifyPaymentAndCreateShipment(
+    String orderId,
+    String paymentId,
+    String signature,
+    Map<String, dynamic> shipmentData,
+  ) {
+    return _send('POST', '/payments/verify-and-create-shipment', {
+      'orderId': orderId,
+      'paymentId': paymentId,
+      'signature': signature,
+      'shipmentData': shipmentData,
+    });
+  }
+
   static Future<List<Map<String, dynamic>>> fetchDrivers() {
     return _getList('/users/drivers');
   }
