@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:razorpay_flutter/razorpay_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../services/api_client.dart';
 
 class PaymentsScreen extends StatefulWidget {
@@ -12,70 +10,11 @@ class PaymentsScreen extends StatefulWidget {
 
 class _PaymentsScreenState extends State<PaymentsScreen> {
   late Future<List<Map<String, dynamic>>> _paymentsFuture;
-  late Razorpay _razorpay;
 
   @override
   void initState() {
     super.initState();
-    _razorpay = Razorpay();
-    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
-    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
-    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
     _refresh();
-  }
-
-  @override
-  void dispose() {
-    _razorpay.clear();
-    super.dispose();
-  }
-
-  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
-    try {
-      // In a real app, you would verify this signature on backend
-      // Here we just update the status assuming it's valid for demo
-      // Or call ApiClient.verifyRazorpayPayment(...)
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Payment Successful: ${response.paymentId}')),
-      );
-      _refresh();
-    } catch (e) {
-      debugPrint('Payment Verification Error: $e');
-    }
-  }
-
-  void _handlePaymentError(PaymentFailureResponse response) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Payment Failed: ${response.message}')),
-    );
-  }
-
-  void _handleExternalWallet(ExternalWalletResponse response) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('External Wallet: ${response.walletName}')),
-    );
-  }
-
-  Future<void> _initiatePayment(double amount, String customerName) async {
-    try {
-      final order = await ApiClient.createRazorpayOrder(amount);
-      
-      var options = {
-        'key': 'YOUR_RAZORPAY_KEY_ID', // Replace with Env var in production
-        'amount': order['amount'],
-        'name': 'Logistics App',
-        'description': 'Invoice Payment',
-        'order_id': order['id'],
-        'prefill': {'contact': '9876543210', 'email': 'test@example.com'},
-        'external': {
-          'wallets': ['paytm']
-        }
-      };
-
-      _razorpay.open(options);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-    }
   }
 
   void _refresh() {
@@ -151,11 +90,15 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                     'invoiceNumber': invoiceNumber,
                     'customerName': customerName,
                     'amount': amount,
+                    'currency': 'INR',
                     'status': status,
                     'lane': lane,
-                    'currency': 'INR',
+                    'method': 'Manual',
                   });
-                  if (mounted) Navigator.pop(ctx);
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Payment created successfully')),
+                  );
                   _refresh();
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -171,320 +114,52 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     );
   }
 
-  Future<void> _deletePayment(String id) async {
-    try {
-      await ApiClient.deletePayment(id);
-      _refresh();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF020617),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Payments',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Cashflow view across customers',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: Colors.white70),
-                      ),
-                    ],
-                  ),
-                  FloatingActionButton(
-                    mini: true,
-                    onPressed: _createPayment,
-                    backgroundColor: Colors.blueAccent,
-                    child: const Icon(Icons.add),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: _paymentsFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.redAccent)));
-                  }
-                  
-                  final payments = snapshot.data ?? [];
-                  
-                  final total = payments.fold<double>(
-                    0,
-                    (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0),
-                  );
-                  final pending = payments
-                      .where((p) => p['status'] == 'Pending')
-                      .fold<double>(0, (s, p) => s + ((p['amount'] as num?)?.toDouble() ?? 0.0));
-                  final overdue = payments
-                      .where((p) => p['status'] == 'Overdue')
-                      .fold<double>(0, (s, p) => s + ((p['amount'] as num?)?.toDouble() ?? 0.0));
-
-                  String _fmt(double v) => '₹${v.toStringAsFixed(0)}';
-
-                  return Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _SummaryCard(
-                                label: 'Total',
-                                value: _fmt(total),
-                                color: Colors.greenAccent,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _SummaryCard(
-                                label: 'Pending',
-                                value: _fmt(pending),
-                                color: Colors.orangeAccent,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _SummaryCard(
-                                label: 'Overdue',
-                                value: _fmt(overdue),
-                                color: Colors.redAccent,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Expanded(
-                        child: payments.isEmpty
-                            ? const Center(child: Text('No payments found'))
-                            : ListView.builder(
-                                itemCount: payments.length,
-                                padding: const EdgeInsets.fromLTRB(20, 0, 20, 80),
-                                itemBuilder: (context, index) {
-                                  final payment = payments[index];
-                                  final id = payment['_id']?.toString() ?? '';
-                                  return TweenAnimationBuilder<double>(
-                                    tween: Tween(begin: 0.0, end: 1.0),
-                                    duration: Duration(milliseconds: 420 + index * 60),
-                                    curve: Curves.easeOutCubic,
-                                    builder: (context, value, child) {
-                                      return Transform.translate(
-                                        offset: Offset(0, 18 * (1 - value)),
-                                        child: Opacity(opacity: value, child: child),
-                                      );
-                                    },
-                                    child: Dismissible(
-                                      key: Key(id),
-                                      direction: DismissDirection.endToStart,
-                                      background: Container(
-                                        alignment: Alignment.centerRight,
-                                        padding: const EdgeInsets.only(right: 20),
-                                        color: Colors.redAccent,
-                                        child: const Icon(Icons.delete, color: Colors.white),
-                                      ),
-                                      onDismissed: (_) => _deletePayment(id),
-                                      child: _PaymentTile(payment: payment),
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+      appBar: AppBar(
+        title: const Text('Payments'),
+        backgroundColor: Colors.transparent,
       ),
-    );
-  }
-}
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _paymentsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: Text('No payments found'));
+          }
 
-
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F172A), Color(0xFF020617)],
-        ),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context)
-                .textTheme
-                .labelSmall
-                ?.copyWith(color: Colors.white70),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 6),
-          Container(
-            height: 3,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(999),
-              gradient: LinearGradient(colors: [color, color.withOpacity(0.2)]),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PaymentTile extends StatelessWidget {
-  const _PaymentTile({required this.payment});
-
-  final Map<String, dynamic> payment;
-
-  Color _statusColor(String status) {
-    switch (status) {
-      case 'Paid':
-        return Colors.greenAccent;
-      case 'Pending':
-        return Colors.orangeAccent;
-      case 'Overdue':
-        return Colors.redAccent;
-      default:
-        return Colors.white;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final String status = payment['status']?.toString() ?? 'Pending';
-    final color = _statusColor(status);
-    final String customerName = payment['customerName']?.toString() ?? 'Unknown';
-    final String invoiceNumber = payment['invoiceNumber']?.toString() ?? 'N/A';
-    final double amount = (payment['amount'] as num?)?.toDouble() ?? 0.0;
-    // Format date if available, or use placeholder
-    final String date = payment['createdAt'] != null 
-        ? payment['createdAt'].toString().substring(0, 10) 
-        : 'Unknown Date';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF020617), Color(0xFF020617)],
-        ),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Row(
-        children: [
-          Container(
-            height: 40,
-            width: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color.withOpacity(0.16),
-            ),
-            child: Icon(Icons.currency_rupee_rounded, color: color, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  customerName,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '$invoiceNumber · $date',
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelSmall
-                      ?.copyWith(color: Colors.white70),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '₹${amount.toStringAsFixed(0)}',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
+          final payments = snapshot.data!;
+          return ListView.builder(
+            itemCount: payments.length,
+            itemBuilder: (context, index) {
+              final payment = payments[index];
+              return Card(
+                child: ListTile(
+                  leading: const Icon(Icons.payment),
+                  title: Text(payment['invoiceNumber'] ?? 'Unknown'),
+                  subtitle: Text('${payment['customerName'] ?? 'Unknown'} - ₹${payment['amount'] ?? 0}'),
+                  trailing: Text(
+                    payment['status'] ?? 'Unknown',
+                    style: TextStyle(
+                      color: payment['status'] == 'Paid' ? Colors.green : Colors.orange,
+                      fontWeight: FontWeight.bold,
                     ),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: color.withOpacity(0.7)),
+                  ),
                 ),
-                child: Text(
-                  status,
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelSmall
-                      ?.copyWith(color: color),
-                ),
-              ),
-            ],
-          ),
-        ],
+              );
+            },
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _createPayment,
+        child: const Icon(Icons.add),
       ),
     );
   }

@@ -1,184 +1,54 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'user_session.dart';
 
-/// Simple API client for the logistics backend.
-///
-/// When you deploy to Render, set [baseUrl] to your live backend URL,
-/// e.g. https://your-backend.onrender.com/api
 class ApiClient {
-  // For local emulator use: http://10.0.2.2:3000/api
-  // For real device on same Wi-Fi use: http://<your_pc_ip>:3000/api
-  // For Render deployment use: https://your-service.onrender.com/api
-  static String baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://flutter-pnvo.onrender.com/api';
+  static String get baseUrl => dotenv.env['API_BASE_URL'] ?? 'https://flutter-pnvo.onrender.com/api';
 
-  static Future<List<Map<String, dynamic>>> _getList(String path) async {
-    final uri = Uri.parse('$baseUrl$path');
-    try {
-      final res = await http.get(uri).timeout(const Duration(seconds: 15));
-      if (res.statusCode >= 200 && res.statusCode < 300) {
-        final List data = jsonDecode(res.body) as List;
-        return data.cast<Map<String, dynamic>>();
+  static Future<Map<String, String>> _getHeaders() async {
+    final user = await UserSession.getUser();
+    final token = user?['token'];
+    return {
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  static dynamic _handleResponse(http.Response response) {
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (response.body.isEmpty) return null;
+      return jsonDecode(response.body);
+    } else {
+      dynamic body;
+      try {
+        body = jsonDecode(response.body);
+      } catch (e) {
+        throw 'Error: ${response.statusCode}';
       }
-      throw Exception('GET $path failed: ${res.statusCode} ${res.body}');
-    } catch (e) {
-      throw Exception('Network error: $e');
+      throw body['message'] ?? 'An error occurred';
     }
   }
 
-  static Future<Map<String, dynamic>> _get(String path) async {
-    final uri = Uri.parse('$baseUrl$path');
-    try {
-      final res = await http.get(uri).timeout(const Duration(seconds: 15));
-      if (res.statusCode >= 200 && res.statusCode < 300) {
-        return jsonDecode(res.body) as Map<String, dynamic>;
-      }
-      throw Exception('GET $path failed: ${res.statusCode} ${res.body}');
-    } catch (e) {
-      throw Exception('Network error: $e');
-    }
+  // Auth Methods
+  static Future<Map<String, dynamic>> login(String email, String password) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'password': password}),
+    );
+    return Map<String, dynamic>.from(_handleResponse(response));
   }
-
-  static Future<Map<String, dynamic>> _send(
-    String method,
-    String path,
-    Map<String, dynamic> body,
-  ) async {
-    final uri = Uri.parse('$baseUrl$path');
-    final headers = {'Content-Type': 'application/json'};
-    late http.Response res;
-    final jsonBody = jsonEncode(body);
-
-    try {
-      switch (method) {
-        case 'POST':
-          res = await http.post(uri, headers: headers, body: jsonBody).timeout(const Duration(seconds: 15));
-          break;
-        case 'PUT':
-          res = await http.put(uri, headers: headers, body: jsonBody).timeout(const Duration(seconds: 15));
-          break;
-        default:
-          throw ArgumentError('Unsupported method $method');
-      }
-
-      if (res.statusCode >= 200 && res.statusCode < 300) {
-        return jsonDecode(res.body) as Map<String, dynamic>;
-      }
-      throw Exception('Request failed: ${res.statusCode} ${res.body}');
-    } catch (e) {
-      throw Exception('Network error: $e');
-    }
-  }
-
-  static Future<void> _delete(String path) async {
-    final uri = Uri.parse('$baseUrl$path');
-    final res = await http.delete(uri);
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception('DELETE $path failed: ${res.statusCode} ${res.body}');
-    }
-  }
-
-  static Future<Map<String, dynamic>> updateUser(String id, Map<String, dynamic> data) {
-    return _send('PUT', '/users/$id', data);
-  }
-
-  // Shipments CRUD -----------------------------------------------------------
-
-  static Future<List<Map<String, dynamic>>> fetchShipments({String? status, String? driverId}) {
-    String query = '?';
-    if (status != null && status != 'All') query += 'status=$status&';
-    if (driverId != null) query += 'driverId=$driverId&';
-    
-    return _getList('/shipments$query');
-  }
-
-  static Future<Map<String, dynamic>> createShipment(
-    Map<String, dynamic> shipment,
-  ) {
-    return _send('POST', '/shipments', shipment);
-  }
-
-  static Future<Map<String, dynamic>> updateShipment(
-    String id,
-    Map<String, dynamic> shipment,
-  ) {
-    return _send('PUT', '/shipments/$id', shipment);
-  }
-
-  static Future<void> requestDeliveryOtp(String shipmentId) {
-    return _send('POST', '/shipments/$shipmentId/otp', {});
-  }
-
-  static Future<void> completeDeliveryWithOtp(String shipmentId, String otp) {
-    return _send('POST', '/shipments/$shipmentId/complete', {'otp': otp});
-  }
-
-  static Future<void> deleteShipment(String id) {
-    return _delete('/shipments/$id');
-  }
-
-  // Fleet CRUD ---------------------------------------------------------------
-
-  static Future<List<Map<String, dynamic>>> fetchFleet() {
-    return _getList('/fleet');
-  }
-
-  static Future<Map<String, dynamic>> createVehicle(
-    Map<String, dynamic> vehicle,
-  ) {
-    return _send('POST', '/fleet', vehicle);
-  }
-
-  static Future<void> deleteVehicle(String id) {
-    return _delete('/fleet/$id');
-  }
-
-  // Payments CRUD ------------------------------------------------------------
-
-  static Future<List<Map<String, dynamic>>> fetchPayments() {
-    return _getList('/payments');
-  }
-
-  static Future<Map<String, dynamic>> createPayment(
-    Map<String, dynamic> payment,
-  ) {
-    return _send('POST', '/payments', payment);
-  }
-
-  static Future<void> deletePayment(String id) {
-    return _delete('/payments/$id');
-  }
-  
-  // Analytics ----------------------------------------------------------------
-  
-  static Future<Map<String, dynamic>> fetchSummaryAnalytics() {
-    return _get('/analytics/summary');
-  }
-
-  // Users / Drivers ----------------------------------------------------------
-
-  static Future<Map<String, dynamic>> login(String email, String password) {
-    return _send('POST', '/users/login', {
-      'email': email,
-      'password': password,
-    });
-  }
-
-  // OTP & Password -----------------------------------------------------------
 
   static Future<void> sendOtp(String phone) async {
-    final res = await _send('POST', '/users/send-otp', {'phone': phone});
-    // Check message?
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/send-otp'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'phone': phone}),
+    );
+    _handleResponse(response);
   }
 
-  static Future<void> resetPassword(String phone, String otp, String newPassword) {
-    return _send('POST', '/users/reset-password', {
-      'phone': phone,
-      'otp': otp,
-      'newPassword': newPassword,
-    });
-  }
-  
   static Future<Map<String, dynamic>> register(
     String name,
     String email,
@@ -186,60 +56,154 @@ class ApiClient {
     String role, {
     String? phone,
     String? otp,
-  }) {
-    return _send('POST', '/users/register', {
-      'name': name,
-      'email': email,
-      'password': password,
-      'role': role,
-      if (phone != null) 'phone': phone,
-      if (otp != null) 'otp': otp,
-    });
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/register'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'name': name,
+        'email': email,
+        'password': password,
+        'role': role,
+        if (phone != null) 'phone': phone,
+        if (otp != null) 'otp': otp,
+      }),
+    );
+    return Map<String, dynamic>.from(_handleResponse(response));
   }
 
-  // Razorpay -----------------------------------------------------------------
-
-  static Future<Map<String, dynamic>> createRazorpayOrder(double amount) {
-    return _send('POST', '/payments/create-order', {
-      'amount': amount,
-      'currency': 'INR',
-      'receipt': 'rcpt_${DateTime.now().millisecondsSinceEpoch}',
-    });
+  static Future<void> resetPassword(String phone, String otp, String newPassword) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/reset-password'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'phone': phone,
+        'otp': otp,
+        'newPassword': newPassword,
+      }),
+    );
+    _handleResponse(response);
   }
 
-  static Future<void> verifyRazorpayPayment(
-    String orderId,
-    String paymentId,
-    String signature,
-    Map<String, dynamic> paymentData,
-  ) {
-    return _send('POST', '/payments/verify-payment', {
-      'orderId': orderId,
-      'paymentId': paymentId,
-      'signature': signature,
-      'paymentData': paymentData,
-    });
+  // Shipment Methods
+  static Future<List<Map<String, dynamic>>> fetchShipments({String? status}) async {
+    String url = '$baseUrl/shipments';
+    if (status != null && status != 'All') {
+      url += '?status=$status';
+    }
+    final response = await http.get(Uri.parse(url), headers: await _getHeaders());
+    final data = _handleResponse(response);
+    return List<Map<String, dynamic>>.from(data);
   }
 
-  static Future<Map<String, dynamic>> verifyPaymentAndCreateShipment(
-    String orderId,
-    String paymentId,
-    String signature,
-    Map<String, dynamic> shipmentData,
-  ) {
-    return _send('POST', '/payments/verify-and-create-shipment', {
-      'orderId': orderId,
-      'paymentId': paymentId,
-      'signature': signature,
-      'shipmentData': shipmentData,
-    });
+  static Future<Map<String, dynamic>> createShipment(Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/shipments'),
+      headers: await _getHeaders(),
+      body: jsonEncode(data),
+    );
+    return Map<String, dynamic>.from(_handleResponse(response));
   }
 
-  static Future<List<Map<String, dynamic>>> fetchDrivers() {
-    return _getList('/users/drivers');
+  static Future<Map<String, dynamic>> updateShipment(String id, Map<String, dynamic> data) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/shipments/$id'),
+      headers: await _getHeaders(),
+      body: jsonEncode(data),
+    );
+    return Map<String, dynamic>.from(_handleResponse(response));
   }
 
-  static Future<List<Map<String, dynamic>>> fetchCustomers() {
-    return _getList('/users/customers');
+  static Future<void> deleteShipment(String id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/shipments/$id'),
+      headers: await _getHeaders(),
+    );
+    _handleResponse(response);
+  }
+
+  static Future<void> requestDeliveryOtp(String shipmentId) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/shipments/$shipmentId/request-otp'),
+      headers: await _getHeaders(),
+    );
+    _handleResponse(response);
+  }
+
+  static Future<void> completeDeliveryWithOtp(String shipmentId, String otp) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/shipments/$shipmentId/complete-otp'),
+      headers: await _getHeaders(),
+      body: jsonEncode({'otp': otp}),
+    );
+    _handleResponse(response);
+  }
+
+  // Fleet Methods
+  static Future<List<Map<String, dynamic>>> fetchFleet() async {
+    final response = await http.get(Uri.parse('$baseUrl/fleet'), headers: await _getHeaders());
+    final data = _handleResponse(response);
+    return List<Map<String, dynamic>>.from(data);
+  }
+
+  static Future<Map<String, dynamic>> createVehicle(Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/fleet'),
+      headers: await _getHeaders(),
+      body: jsonEncode(data),
+    );
+    return Map<String, dynamic>.from(_handleResponse(response));
+  }
+
+  static Future<void> deleteVehicle(String id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/fleet/$id'),
+      headers: await _getHeaders(),
+    );
+    _handleResponse(response);
+  }
+
+  // Payment Methods
+  static Future<List<Map<String, dynamic>>> fetchPayments() async {
+    final response = await http.get(Uri.parse('$baseUrl/payments'), headers: await _getHeaders());
+    final data = _handleResponse(response);
+    return List<Map<String, dynamic>>.from(data);
+  }
+
+  static Future<Map<String, dynamic>> createPayment(Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/payments'),
+      headers: await _getHeaders(),
+      body: jsonEncode(data),
+    );
+    return Map<String, dynamic>.from(_handleResponse(response));
+  }
+
+  // Analytics Methods
+  static Future<Map<String, dynamic>> fetchSummaryAnalytics() async {
+    final response = await http.get(Uri.parse('$baseUrl/analytics/summary'), headers: await _getHeaders());
+    return Map<String, dynamic>.from(_handleResponse(response));
+  }
+
+  // User/Client Methods
+  static Future<List<Map<String, dynamic>>> fetchDrivers() async {
+    final response = await http.get(Uri.parse('$baseUrl/users/drivers'), headers: await _getHeaders());
+    final data = _handleResponse(response);
+    return List<Map<String, dynamic>>.from(data);
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchCustomers() async {
+    final response = await http.get(Uri.parse('$baseUrl/users/customers'), headers: await _getHeaders());
+    final data = _handleResponse(response);
+    return List<Map<String, dynamic>>.from(data);
+  }
+
+  static Future<Map<String, dynamic>> updateUser(String id, Map<String, dynamic> data) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/users/$id'),
+      headers: await _getHeaders(),
+      body: jsonEncode(data),
+    );
+    return Map<String, dynamic>.from(_handleResponse(response));
   }
 }

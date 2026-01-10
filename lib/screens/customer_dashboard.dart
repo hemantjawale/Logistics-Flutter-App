@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:intl/intl.dart';
+import '../models/shipment.dart';
 import '../services/api_client.dart';
 import '../services/user_session.dart';
 import 'tracking_screen.dart';
@@ -14,20 +15,15 @@ class CustomerDashboard extends StatefulWidget {
 class _CustomerDashboardState extends State<CustomerDashboard> {
   List<Map<String, dynamic>> _myShipments = [];
   bool _isLoading = true;
-  final Razorpay _razorpay = Razorpay();
 
   @override
   void initState() {
     super.initState();
     _loadShipments();
-    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
-    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
-    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
   }
 
   @override
   void dispose() {
-    _razorpay.clear();
     super.dispose();
   }
 
@@ -44,61 +40,46 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
     }
   }
 
-  void _handlePaymentSuccess(PaymentSuccessResponse response) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Payment Successful: ${response.paymentId}')),
-    );
-    // Create shipment after successful payment using end-to-end endpoint
-    if (_pendingShipmentData != null) {
-      _verifyPaymentAndCreateShipment(response);
-    }
-  }
-
-  Future<void> _verifyPaymentAndCreateShipment(PaymentSuccessResponse paymentResponse) async {
+  Future<void> _createShipment({
+    required String destination,
+    required String category,
+    required double length,
+    required double width,
+    required double height,
+    required double weight,
+    required double price,
+    required String priority,
+  }) async {
+    setState(() => _isLoading = true);
     try {
-      setState(() => _isLoading = true);
-      
       final user = await UserSession.getUser();
+      
       final shipmentData = {
         'trackingNumber': 'TRK-${DateTime.now().millisecondsSinceEpoch}',
         'origin': 'Current Location',
-        'destination': _pendingShipmentData!['destination'],
-        'category': _pendingShipmentData!['category'],
+        'destination': destination,
+        'category': category,
         'customerId': user?['_id'],
-        'weight': _pendingShipmentData!['weight'],
+        'weight': weight,
         'dimensions': {
-          'length': _pendingShipmentData!['length'] * 100, // Convert to cm
-          'width': _pendingShipmentData!['width'] * 100,
-          'height': _pendingShipmentData!['height'] * 100,
+          'length': length * 100, // Convert meters to cm
+          'width': width * 100,
+          'height': height * 100,
         },
-        'price': _pendingShipmentData!['price'],
-        'priority': _pendingShipmentData!['priority'],
+        'price': price,
+        'priority': priority,
         'autoAssignDriver': true,
         'notes': 'Created via customer app',
-        'customerName': user?['name'] ?? 'Customer',
       };
 
-      final result = await ApiClient.verifyPaymentAndCreateShipment(
-        paymentResponse.orderId ?? '',
-        paymentResponse.paymentId ?? '',
-        paymentResponse.signature ?? '',
-        shipmentData,
-      );
-
-      if (result['success'] == true) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Shipment created successfully!')),
-          );
-        }
-        _loadShipments();
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: ${result['error'] ?? 'Failed to create shipment'}')),
-          );
-        }
+      await ApiClient.createShipment(shipmentData);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Shipment created successfully!')),
+        );
       }
+      _loadShipments();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -106,21 +87,8 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
         );
       }
     } finally {
-      _pendingShipmentData = null;
       setState(() => _isLoading = false);
     }
-  }
-
-  void _handlePaymentError(PaymentFailureResponse response) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Payment Failed: ${response.message}')),
-    );
-  }
-
-  void _handleExternalWallet(ExternalWalletResponse response) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('External Wallet: ${response.walletName}')),
-    );
   }
 
   void _showRequestShipmentDialog() {
@@ -304,17 +272,18 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                 final finalPrice = (basePrice * 100).round() / 100;
 
                 Navigator.pop(context);
-                await _openRazorpay(finalPrice, {
-                  'destination': destinationController.text,
-                  'category': selectedCategory,
-                  'length': length,
-                  'width': width,
-                  'height': height,
-                  'weight': weight,
-                  'price': finalPrice,
-                });
+                await _createShipment(
+                  destination: destinationController.text,
+                  category: selectedCategory,
+                  length: length,
+                  width: width,
+                  height: height,
+                  weight: weight,
+                  price: finalPrice,
+                  priority: selectedPriority,
+                );
               },
-              child: const Text('Pay & Request'),
+              child: const Text('Create Shipment'),
             ),
           ],
         ),
@@ -374,41 +343,6 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
     return const SizedBox.shrink();
   }
 
-  Future<void> _openRazorpay(double amount, Map<String, dynamic> shipmentData) async {
-    try {
-      // Create Razorpay order from backend
-      final order = await ApiClient.createRazorpayOrder(amount);
-      
-      final options = {
-        'key': 'rzp_live_Ru1kOSbo78LMRS', // From .env file
-        'amount': (amount * 100).toInt(), // Convert to paise
-        'name': 'Shipment Payment',
-        'description': 'Payment for shipment creation',
-        'order_id': order['id'],
-        'timeout': 300, // 5 minutes
-        'currency': 'INR',
-        'prefill': {
-          'contact': '',
-          'email': '',
-        },
-        'notes': {
-          'shipment_type': shipmentData['category'],
-          'priority': shipmentData['priority'],
-        }
-      };
-
-      _razorpay.open(options);
-      
-      // Store shipment data for after payment
-      _pendingShipmentData = shipmentData;
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Payment Error: $e')),
-      );
-    }
-  }
-
-  Map<String, dynamic>? _pendingShipmentData;
 
   @override
   Widget build(BuildContext context) {
