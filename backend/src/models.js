@@ -41,6 +41,11 @@ const shipmentSchema = new mongoose.Schema(
     },
     price: { type: Number },
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    category: {
+      type: String,
+      enum: ['Agriculture', 'Textiles', 'Electronics', 'Pharmaceuticals', 'Automotive', 'FMCG', 'Construction', 'Other'],
+      default: 'Other'
+    },
     pickupLocation: {
       type: { type: String, enum: ['Point'], default: 'Point' },
       coordinates: { type: [Number], default: [0, 0] }, // [lng, lat]

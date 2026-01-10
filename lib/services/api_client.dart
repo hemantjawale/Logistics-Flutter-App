@@ -78,6 +78,10 @@ class ApiClient {
     }
   }
 
+  static Future<Map<String, dynamic>> updateUser(String id, Map<String, dynamic> data) {
+    return _send('PUT', '/users/$id', data);
+  }
+
   // Shipments CRUD -----------------------------------------------------------
 
   static Future<List<Map<String, dynamic>>> fetchShipments({String? status, String? driverId}) {

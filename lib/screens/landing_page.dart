@@ -4,6 +4,8 @@ import '../main.dart'; // Import MainShell
 import 'otp_screen.dart';
 import 'forgot_password_screen.dart';
 
+import '../services/user_session.dart';
+
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
 
@@ -125,10 +127,11 @@ class _AuthScreenState extends State<AuthScreen> {
     setState(() => _isLoading = true);
     try {
       if (_isLogin) {
-        await ApiClient.login(
+        final response = await ApiClient.login(
           _emailController.text,
           _passwordController.text,
         );
+        await UserSession.saveUser(response['user']);
         _navToDashboard();
       } else {
         // Registration Flow with OTP
@@ -147,12 +150,13 @@ class _AuthScreenState extends State<AuthScreen> {
            }
         } else {
           // If phone is mandatory, show error, otherwise register without phone
-           await ApiClient.register(
+           final response = await ApiClient.register(
             _nameController.text,
             _emailController.text,
             _passwordController.text,
             _role,
           );
+          await UserSession.saveUser(response['user']);
           _navToDashboard();
         }
       }
@@ -169,7 +173,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _finishRegistration(String otp) async {
     try {
-      await ApiClient.register(
+      final response = await ApiClient.register(
         _nameController.text,
         _emailController.text,
         _passwordController.text,
@@ -177,6 +181,8 @@ class _AuthScreenState extends State<AuthScreen> {
         phone: _phoneController.text,
         otp: otp,
       );
+      await UserSession.saveUser(response['user']);
+
       if (mounted) {
          // Pop OTP screen
          Navigator.pop(context); 
