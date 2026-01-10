@@ -102,6 +102,17 @@ router.get('/drivers', async (req, res) => {
   }
 });
 
+// GET CUSTOMERS (New Endpoint)
+router.get('/customers', async (req, res) => {
+  try {
+    const customers = await User.find({ role: 'customer' }).select('name email phone status');
+    res.json(customers);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch customers' });
+  }
+});
+
 // READ all users
 router.get('/', async (req, res) => {
   try {

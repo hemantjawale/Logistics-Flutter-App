@@ -224,4 +224,8 @@ class ApiClient {
   static Future<List<Map<String, dynamic>>> fetchDrivers() {
     return _getList('/users/drivers');
   }
+
+  static Future<List<Map<String, dynamic>>> fetchCustomers() {
+    return _getList('/users/customers');
+  }
 }

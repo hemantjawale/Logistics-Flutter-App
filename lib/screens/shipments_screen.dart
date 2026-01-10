@@ -37,13 +37,20 @@ class _ShipmentsScreenState extends State<ShipmentsScreen> {
     double height = 0.0;
     bool autoAssignDriver = false;
     String? selectedDriverId;
+    String? selectedCustomerId;
+    String category = 'Other';
+    String priority = 'Normal';
     List<Map<String, dynamic>> drivers = [];
+    List<Map<String, dynamic>> customers = [];
+    DateTime? etaDate;
+    String notes = '';
 
-    // Fetch drivers for the dropdown
+    // Fetch drivers and customers for the dropdowns
     try {
       drivers = await ApiClient.fetchDrivers();
+      customers = await ApiClient.fetchCustomers();
     } catch (e) {
-      debugPrint('Error fetching drivers: $e');
+      debugPrint('Error fetching data: $e');
     }
 
     if (!mounted) return;
@@ -141,6 +148,76 @@ class _ShipmentsScreenState extends State<ShipmentsScreen> {
                       style: const TextStyle(color: Colors.greenAccent, fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 10),
+                    const Text('Additional Information', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    DropdownButtonFormField<String>(
+                      dropdownColor: const Color(0xFF334155),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(labelText: 'Category', labelStyle: TextStyle(color: Colors.white70)),
+                      value: category,
+                      items: const [
+                        DropdownMenuItem(value: 'Agriculture', child: Text('Agriculture')),
+                        DropdownMenuItem(value: 'Textiles', child: Text('Textiles')),
+                        DropdownMenuItem(value: 'Electronics', child: Text('Electronics')),
+                        DropdownMenuItem(value: 'Pharmaceuticals', child: Text('Pharmaceuticals')),
+                        DropdownMenuItem(value: 'Automotive', child: Text('Automotive')),
+                        DropdownMenuItem(value: 'FMCG', child: Text('FMCG')),
+                        DropdownMenuItem(value: 'Construction', child: Text('Construction')),
+                        DropdownMenuItem(value: 'Other', child: Text('Other')),
+                      ],
+                      onChanged: (v) => setState(() => category = v!),
+                      onSaved: (v) => category = v!,
+                    ),
+                    DropdownButtonFormField<String>(
+                      dropdownColor: const Color(0xFF334155),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(labelText: 'Priority', labelStyle: TextStyle(color: Colors.white70)),
+                      value: priority,
+                      items: const [
+                        DropdownMenuItem(value: 'Low', child: Text('Low')),
+                        DropdownMenuItem(value: 'Normal', child: Text('Normal')),
+                        DropdownMenuItem(value: 'High', child: Text('High')),
+                        DropdownMenuItem(value: 'Critical', child: Text('Critical')),
+                      ],
+                      onChanged: (v) => setState(() => priority = v!),
+                      onSaved: (v) => priority = v!,
+                    ),
+                    const SizedBox(height: 10),
+                    const Text('Customer Assignment', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    DropdownButtonFormField<String>(
+                      dropdownColor: const Color(0xFF334155),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(labelText: 'Select Customer', labelStyle: TextStyle(color: Colors.white70)),
+                      items: customers.map((c) => DropdownMenuItem(
+                        value: c['_id'].toString(),
+                        child: Text('${c['name'] ?? 'Unknown'} (${c['email'] ?? 'No email'})'),
+                      )).toList(),
+                      onChanged: (v) => setState(() => selectedCustomerId = v),
+                      onSaved: (v) => selectedCustomerId = v,
+                    ),
+                    const SizedBox(height: 10),
+                    ListTile(
+                      title: const Text('ETA Date', style: TextStyle(color: Colors.white)),
+                      subtitle: Text(etaDate != null ? '${etaDate!.day}/${etaDate!.month}/${etaDate!.year}' : 'Select delivery date', style: const TextStyle(color: Colors.white70)),
+                      trailing: const Icon(Icons.calendar_today, color: Colors.white70),
+                      onTap: () async {
+                        final date = await showDatePicker(
+                          context: context,
+                          initialDate: etaDate ?? DateTime.now().add(const Duration(days: 3)),
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                        );
+                        if (date != null) {
+                          setState(() => etaDate = date);
+                        }
+                      },
+                    ),
+                    TextFormField(
+                      decoration: const InputDecoration(labelText: 'Notes (Optional)', labelStyle: TextStyle(color: Colors.white70)),
+                      style: const TextStyle(color: Colors.white),
+                      maxLines: 2,
+                      onSaved: (v) => notes = v ?? '',
+                    ),
+                    const SizedBox(height: 10),
                     const Text('Driver Assignment', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     SwitchListTile(
                       title: const Text('Auto-Assign Driver', style: TextStyle(color: Colors.white)),
@@ -185,7 +262,11 @@ class _ShipmentsScreenState extends State<ShipmentsScreen> {
                         'dimensions': {'length': length, 'width': width, 'height': height},
                         'autoAssignDriver': autoAssignDriver,
                         'driverId': selectedDriverId,
-                        'eta': DateTime.now().add(const Duration(days: 3)).toIso8601String(),
+                        'customerId': selectedCustomerId,
+                        'category': category,
+                        'priority': priority,
+                        'eta': etaDate?.toIso8601String() ?? DateTime.now().add(const Duration(days: 3)).toIso8601String(),
+                        'notes': notes,
                       });
                       if (mounted) Navigator.pop(ctx);
                       _refresh();
@@ -331,6 +412,12 @@ class _ShipmentsScreenState extends State<ShipmentsScreen> {
                           const SizedBox(height: 4),
                           if (shipment['price'] != null)
                              Text('Price: ₹${shipment['price']}', style: const TextStyle(color: Colors.greenAccent, fontSize: 12)),
+                          if (shipment['category'] != null && shipment['category'] != 'Other')
+                             Text('Category: ${shipment['category']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                          if (shipment['priority'] != null && shipment['priority'] != 'Normal')
+                             Text('Priority: ${shipment['priority']}', style: const TextStyle(color: Colors.orangeAccent, fontSize: 12)),
+                          if (shipment['customerId'] != null && shipment['customerId'] is Map && shipment['customerId']['name'] != null)
+                             Text('Customer: ${shipment['customerId']['name']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
                         ],
                       ),
                       trailing: Column(

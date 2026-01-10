@@ -56,6 +56,7 @@ const shipmentSchema = new mongoose.Schema(
       coordinates: { type: [Number], default: [0, 0] }, // [lng, lat]
       address: { type: String }
     },
+    notes: { type: String },
   },
   { timestamps: true }
 );

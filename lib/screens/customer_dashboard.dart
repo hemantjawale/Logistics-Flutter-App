@@ -130,10 +130,10 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         onPressed: _showRequestShipmentDialog,
-        icon: const Icon(Icons.add_location_alt),
-        label: const Text('Request Shipment'),
+        child: const Icon(Icons.add),
+        tooltip: 'Request Shipment',
       ),
     );
   }
