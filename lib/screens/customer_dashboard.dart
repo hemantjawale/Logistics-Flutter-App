@@ -80,7 +80,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
 
       final result = await ApiClient.verifyPaymentAndCreateShipment(
         paymentResponse.orderId ?? '',
-        paymentResponse.paymentId,
+        paymentResponse.paymentId ?? '',
         paymentResponse.signature ?? '',
         shipmentData,
       );
@@ -391,6 +391,10 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
           'contact': '',
           'email': '',
         },
+        'notes': {
+          'shipment_type': shipmentData['category'],
+          'priority': shipmentData['priority'],
+        }
       };
 
       _razorpay.open(options);

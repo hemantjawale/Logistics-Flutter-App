@@ -12,6 +12,10 @@ export const createOrder = async (amount, currency = 'INR', receipt) => {
       amount: amount * 100, // Amount in smallest currency unit (paise)
       currency,
       receipt,
+      notes: {
+        "key1": "value3",
+        "key2": "value2"
+      }
     };
     const order = await razorpay.orders.create(options);
     return order;
