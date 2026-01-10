@@ -59,15 +59,66 @@ class _DriverDashboardState extends State<DriverDashboard> {
   }
 
   Future<void> _completeJob(String shipmentId) async {
+    // 1. Request OTP
     try {
-      await ApiClient.updateShipment(shipmentId, {'status': 'Delivered'});
+      await ApiClient.requestDeliveryOtp(shipmentId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('OTP sent to Customer')));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to send OTP: $e')));
+      }
+      return; // Stop if OTP failed
+    }
+
+    // 2. Show Dialog to enter OTP
+    if (!mounted) return;
+    final otpController = TextEditingController();
+    final otp = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Enter Delivery OTP'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Ask customer for the OTP sent to their mobile.'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: otpController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'OTP',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, otpController.text),
+            child: const Text('Verify & Complete'),
+          ),
+        ],
+      ),
+    );
+
+    if (otp == null || otp.isEmpty) return;
+
+    // 3. Verify OTP and Complete
+    try {
+      await ApiClient.completeDeliveryWithOtp(shipmentId, otp);
       _loadJobs();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Job Completed!')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Job Completed Successfully!')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Verification Failed: $e')));
       }
     }
   }

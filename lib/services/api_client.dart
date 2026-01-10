@@ -105,6 +105,14 @@ class ApiClient {
     return _send('PUT', '/shipments/$id', shipment);
   }
 
+  static Future<void> requestDeliveryOtp(String shipmentId) {
+    return _send('POST', '/shipments/$shipmentId/otp', {});
+  }
+
+  static Future<void> completeDeliveryWithOtp(String shipmentId, String otp) {
+    return _send('POST', '/shipments/$shipmentId/complete', {'otp': otp});
+  }
+
   static Future<void> deleteShipment(String id) {
     return _delete('/shipments/$id');
   }

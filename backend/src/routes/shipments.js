@@ -1,7 +1,57 @@
 import express from 'express';
 import { Shipment, User } from '../models.js';
+import { sendOtp, verifyOtp } from '../utils/otpService.js';
 
 const router = express.Router();
+
+// REQUEST DELIVERY OTP
+router.post('/:id/otp', async (req, res) => {
+  try {
+    const shipment = await Shipment.findById(req.params.id).populate('customerId');
+    if (!shipment) return res.status(404).json({ error: 'Shipment not found' });
+    
+    const customer = shipment.customerId;
+    if (!customer || !customer.phone) {
+      // For demo purposes if customer has no phone, we might want to allow bypass or error out
+      return res.status(400).json({ error: 'Customer phone number not found on shipment' });
+    }
+
+    await sendOtp(customer.phone);
+    res.json({ message: 'OTP sent to customer', phone: customer.phone }); // Return phone for debug/UI hint
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to send OTP' });
+  }
+});
+
+// COMPLETE DELIVERY (VERIFY OTP)
+router.post('/:id/complete', async (req, res) => {
+  try {
+    const { otp } = req.body;
+    if (!otp) return res.status(400).json({ error: 'OTP is required' });
+
+    const shipment = await Shipment.findById(req.params.id).populate('customerId');
+    if (!shipment) return res.status(404).json({ error: 'Shipment not found' });
+
+    const customer = shipment.customerId;
+    if (!customer || !customer.phone) {
+      return res.status(400).json({ error: 'Customer phone number not found' });
+    }
+
+    // In a real app, you might want a "Force Complete" for managers, but here we enforce OTP
+    const isValid = verifyOtp(customer.phone, otp);
+    if (!isValid) return res.status(400).json({ error: 'Invalid or expired OTP' });
+
+    shipment.status = 'Delivered';
+    shipment.progress = 1.0;
+    await shipment.save();
+
+    res.json({ message: 'Shipment delivered successfully', shipment });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to complete delivery' });
+  }
+});
 
 // CREATE shipment
 router.post('/', async (req, res) => {
