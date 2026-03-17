@@ -190,6 +190,17 @@ class _DriverDashboardState extends State<DriverDashboard> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextButton.icon(
+                            onPressed: () {
+                              // TODO: Show Incident Report Dialog
+                            },
+                            icon: const Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent, size: 16),
+                            label: const Text('Report Delay / Breakdown', style: TextStyle(color: Colors.orangeAccent, fontSize: 12)),
+                          ),
+                        ),
                       ],
                     ),
                   ),

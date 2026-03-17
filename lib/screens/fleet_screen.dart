@@ -165,6 +165,8 @@ class _FleetScreenState extends State<FleetScreen> {
               ],
             ),
             const SizedBox(height: 16),
+            _MaintenanceAlerts(),
+            const SizedBox(height: 16),
             Expanded(
               child: FutureBuilder<List<Map<String, dynamic>>>(
                 future: _fleetFuture,
@@ -335,6 +337,71 @@ class _FleetScreenState extends State<FleetScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _MaintenanceAlerts extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.redAccent.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.redAccent.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                'Maintenance Alerts',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: Colors.redAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _alertItem(context, 'DL01AB1234', 'Service needed (+5,400km)', Icons.build_circle),
+          const SizedBox(height: 8),
+          _alertItem(context, 'UP16CD5678', 'Insurance expiring in 3 days', Icons.description_rounded),
+        ],
+      ),
+    );
+  }
+
+  Widget _alertItem(BuildContext context, String code, String message, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: Colors.white54),
+        const SizedBox(width: 8),
+        Text(
+          code,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            message,
+            style: const TextStyle(color: Colors.white60, fontSize: 11),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        TextButton(
+          onPressed: () {},
+          style: TextButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
+          child: const Text('Schedule', style: TextStyle(fontSize: 10, color: Colors.lightBlueAccent)),
+        ),
+      ],
     );
   }
 }

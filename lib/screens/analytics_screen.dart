@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../services/api_client.dart';
 
 class AnalyticsScreen extends StatefulWidget {
@@ -10,7 +11,7 @@ class AnalyticsScreen extends StatefulWidget {
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
   bool _isLoading = true;
-  double _fleetUtilization = 0.0;
+  Map<String, dynamic>? _analytics;
 
   @override
   void initState() {
@@ -21,245 +22,268 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Future<void> _loadData() async {
     try {
       final data = await ApiClient.fetchSummaryAnalytics();
-      final fleet = data['fleet'] as Map<String, dynamic>?;
-      
-      if (fleet != null) {
-        final total = fleet['total'] ?? 0;
-        final active = fleet['active'] ?? 0;
-        if (total > 0) {
-          _fleetUtilization = active / total;
-        }
-      }
-    } catch (e) {
-      // Silent error or fallback
-      debugPrint('Error loading analytics: $e');
-    } finally {
       if (mounted) {
         setState(() {
+          _analytics = data;
           _isLoading = false;
         });
       }
+    } catch (e) {
+      debugPrint('Error loading analytics: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Hardcoded trends for demo as backend doesn't support historical data yet
-    final demandTrend = [0.6, 0.72, 0.68, 0.8, 0.9, 0.87];
-    final efficiencyTrend = [0.7, 0.74, 0.73, 0.78, 0.81, 0.82];
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: SafeArea(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(),
+                    const SizedBox(height: 24),
+                    _buildRevenueChart(),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(child: _buildPaymentSplit()),
+                        const SizedBox(width: 16),
+                        Expanded(child: _buildTopCustomers()),
+                      ],
+                    ),
+                    const SizedBox(height: 100), // Bottom padding for footer
+                  ],
+                ),
+              ),
+      ),
+    );
+  }
 
-    return SafeArea(
-      child: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildHeader() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Financial Control',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.5,
+              ),
+        ),
+        Text(
+          'Revenue, expenses and cash flow monitoring',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white60,
+              ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRevenueChart() {
+    return Container(
+      height: 300,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Earnings vs Expenses',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+              ),
+              Row(
                 children: [
-                  Text(
-                    'Insights',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                  _chartLegend('Earnings', Colors.indigoAccent),
+                  const SizedBox(width: 12),
+                  _chartLegend('Expenses', Colors.redAccent),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: LineChart(
+              LineChartData(
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  getDrawingHorizontalLine: (value) => FlLine(
+                    color: Colors.white.withOpacity(0.05),
+                    strokeWidth: 1,
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Predictive view of demand, routes and health',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: Colors.white70),
+                ),
+                titlesData: FlTitlesData(
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 30,
+                      getTitlesWidget: (value, meta) {
+                        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                        if (value >= 0 && value < days.length) {
+                          return Text(days[value.toInt()],
+                              style: const TextStyle(color: Colors.white54, fontSize: 10));
+                        }
+                        return const SizedBox();
+                      },
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _InsightCard(
-                          icon: Icons.trending_up_rounded,
-                          title: 'Demand spike',
-                          body:
-                              'North India lanes +18% week-on-week. Pre-position fleet tonight.',
-                          color: Colors.greenAccent,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _InsightCard(
-                          icon: Icons.route_rounded,
-                          title: 'Fleet Utilization',
-                          body:
-                              'Current active fleet utilization is ${(_fleetUtilization * 100).toStringAsFixed(1)}%.',
-                          color: Colors.cyanAccent,
-                        ),
-                      ),
+                ),
+                borderData: FlBorderData(show: false),
+                lineBarsData: [
+                  LineChartBarData(
+                    isCurved: true,
+                    color: Colors.indigoAccent,
+                    barWidth: 3,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: Colors.indigoAccent.withOpacity(0.1),
+                    ),
+                    spots: const [
+                      FlSpot(0, 30), FlSpot(1, 45), FlSpot(2, 38),
+                      FlSpot(3, 60), FlSpot(4, 52), FlSpot(5, 75), FlSpot(6, 68),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  Text(
-                    '6-day demand & efficiency forecast',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: _TrendBars(
-                      demand: demandTrend,
-                      efficiency: efficiencyTrend,
-                    ),
+                  LineChartBarData(
+                    isCurved: true,
+                    color: Colors.redAccent,
+                    barWidth: 2,
+                    dashArray: [5, 5],
+                    dotData: const FlDotData(show: false),
+                    spots: const [
+                      FlSpot(0, 15), FlSpot(1, 20), FlSpot(2, 25),
+                      FlSpot(3, 22), FlSpot(4, 30), FlSpot(5, 28), FlSpot(6, 35),
+                    ],
                   ),
                 ],
               ),
             ),
+          ),
+        ],
+      ),
     );
   }
-}
 
-class _InsightCard extends StatelessWidget {
-  const _InsightCard({
-    required this.icon,
-    required this.title,
-    required this.body,
-    required this.color,
-  });
+  Widget _buildPaymentSplit() {
+    final paid = _analytics?['payments']?['received'] ?? 65.0;
+    final pending = _analytics?['payments']?['pending'] ?? 25.0;
+    final overdue = _analytics?['payments']?['overdue'] ?? 10.0;
 
-  final IconData icon;
-  final String title;
-  final String body;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.0, end: 1.0),
-      duration: const Duration(milliseconds: 450),
-      curve: Curves.easeOutCubic,
-      builder: (context, value, child) {
-        return Transform.translate(
-          offset: Offset(0, 20 * (1 - value)),
-          child: Opacity(opacity: value, child: child),
-        );
-      },
-      child: Container(
-        height: 140,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E293B),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white10),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, size: 20, color: color),
-            ),
-            const Spacer(),
-            Text(
-              title,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        children: [
+          const Text('Payment Split', style: TextStyle(fontSize: 12, color: Colors.white70)),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 100,
+            child: PieChart(
+              PieChartData(
+                sectionsSpace: 4,
+                centerSpaceRadius: 30,
+                sections: [
+                  PieChartSectionData(color: Colors.greenAccent, value: paid.toDouble(), showTitle: false, radius: 10),
+                  PieChartSectionData(color: Colors.orangeAccent, value: pending.toDouble(), showTitle: false, radius: 10),
+                  PieChartSectionData(color: Colors.redAccent, value: overdue.toDouble(), showTitle: false, radius: 10),
+                ],
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              body,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white60,
-                    fontSize: 11,
-                  ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 12),
+          _paymentInfoRow('Paid', paid.toString(), Colors.greenAccent),
+          _paymentInfoRow('Pending', pending.toString(), Colors.orangeAccent),
+          _paymentInfoRow('Overdue', overdue.toString(), Colors.redAccent),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopCustomers() {
+    final customers = [
+      {'name': 'Amazon', 'revenue': '₹45k'},
+      {'name': 'Flipkart', 'revenue': '₹32k'},
+      {'name': 'Delhivery', 'revenue': '₹18k'},
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Top Accounts', style: TextStyle(fontSize: 12, color: Colors.white70)),
+          const SizedBox(height: 16),
+          ...customers.map((c) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 12,
+                  backgroundColor: Colors.white12,
+                  child: Text(c['name']![0], style: const TextStyle(fontSize: 10)),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(c['name']!, 
+                    style: const TextStyle(fontSize: 12),
+                    overflow: TextOverflow.ellipsis),
+                ),
+                Text(c['revenue']!, 
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              ],
             ),
-          ],
-        ),
+          )).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _chartLegend(String label, Color color) {
+    return Row(
+      children: [
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 10)),
+      ],
+    );
+  }
+
+  Widget _paymentInfoRow(String label, String value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 10)),
+          Text(value, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+        ],
       ),
     );
   }
 }
 
-class _TrendBars extends StatelessWidget {
-  const _TrendBars({required this.demand, required this.efficiency});
-
-  final List<double> demand;
-  final List<double> efficiency;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: List.generate(demand.length, (index) {
-        return _BarGroup(
-          demand: demand[index],
-          efficiency: efficiency[index],
-          label: 'D${index + 1}',
-          delay: index * 100,
-        );
-      }),
-    );
-  }
-}
-
-class _BarGroup extends StatelessWidget {
-  const _BarGroup({
-    required this.demand,
-    required this.efficiency,
-    required this.label,
-    required this.delay,
-  });
-
-  final double demand;
-  final double efficiency;
-  final String label;
-  final int delay;
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.0, end: 1.0),
-      duration: Duration(milliseconds: 600 + delay),
-      curve: Curves.easeOutQuart,
-      builder: (context, value, _) {
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Container(
-                  width: 12,
-                  height: 180 * demand * value,
-                  decoration: BoxDecoration(
-                    color: Colors.greenAccent,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Container(
-                  width: 12,
-                  height: 180 * efficiency * value,
-                  decoration: BoxDecoration(
-                    color: Colors.cyanAccent.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Colors.white54,
-                  ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}

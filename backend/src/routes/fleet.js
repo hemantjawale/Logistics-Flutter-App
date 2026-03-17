@@ -52,6 +52,28 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// UPDATE LOCATION
+router.post('/:id/location', async (req, res) => {
+  try {
+    const { lat, lng } = req.body;
+    if (lat === undefined || lng === undefined) return res.status(400).json({ error: 'Lat and Lng are required' });
+
+    const vehicle = await Vehicle.findById(req.params.id);
+    if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' });
+
+    vehicle.currentCoordinates = {
+      type: 'Point',
+      coordinates: [lng, lat]
+    };
+    
+    await vehicle.save();
+    res.json({ success: true, location: vehicle.currentCoordinates });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update location' });
+  }
+});
+
 // DELETE vehicle
 router.delete('/:id', async (req, res) => {
   try {

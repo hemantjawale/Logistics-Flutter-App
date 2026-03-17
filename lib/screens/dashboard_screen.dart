@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/api_client.dart';
 import 'package:intl/intl.dart';
+import 'fleet_map_screen.dart';
+import 'analytics_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -117,9 +119,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             _SectionHeader(
                               title: 'Live Shipments',
                               subtitle: 'Track routes and ETAs in real time',
+                              onAction: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const FleetMapScreen()),
+                                );
+                              },
                             ),
                             const SizedBox(height: 12),
                             _ShipmentsStrip(shipments: _activeShipments),
+                            const SizedBox(height: 24),
+                            _SectionHeader(
+                              title: 'Quick Actions',
+                              subtitle: 'Manage your operations efficiently',
+                            ),
+                            const SizedBox(height: 12),
+                            _QuickActionsRow(),
                             const SizedBox(height: 24),
                             _SectionHeader(
                               title: 'Smart Alerts',
@@ -172,6 +187,8 @@ class _Header extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.3,
                     ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 6),
               Text(
@@ -179,6 +196,8 @@ class _Header extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Colors.white70,
                     ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -284,6 +303,8 @@ class _KpiCard extends StatelessWidget {
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Colors.white70,
                 ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 8),
           Text(
@@ -291,17 +312,21 @@ class _KpiCard extends StatelessWidget {
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 8),
-          ShaderMask(
-            shaderCallback: (bounds) => accent.createShader(bounds),
-            child: Text(
-              trend,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white,
-                  ),
+            ShaderMask(
+              shaderCallback: (bounds) => accent.createShader(bounds),
+              child: Text(
+                trend,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.white,
+                    ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -387,6 +412,7 @@ class _ShipmentsStrip extends StatelessWidget {
                           color: color.withOpacity(0.18),
                         ),
                         child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Container(
                               width: 6,
@@ -397,20 +423,29 @@ class _ShipmentsStrip extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 6),
-                            Text(
-                              status,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
-                                  ?.copyWith(color: color),
+                            Flexible(
+                              child: Text(
+                                status,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(color: color),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      const Spacer(),
-                      Text(
-                        shipment['trackingNumber'] ?? '',
-                        style: Theme.of(context).textTheme.labelMedium,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          shipment['trackingNumber'] ?? '',
+                          style: Theme.of(context).textTheme.labelMedium,
+                          textAlign: TextAlign.end,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
@@ -490,6 +525,115 @@ class _ShipmentsStrip extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _QuickActionsRow extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _QuickActionItem(
+            icon: Icons.map_rounded,
+            label: 'Live Tracking',
+            color: Colors.blueAccent,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const FleetMapScreen()),
+              );
+            },
+          ),
+          const SizedBox(width: 12),
+          _QuickActionItem(
+            icon: Icons.assignment_turned_in_rounded,
+            label: 'Proof of Delivery',
+            color: Colors.greenAccent,
+            onTap: () {
+              // TODO: Implement POD Screen
+            },
+          ),
+          const SizedBox(width: 12),
+          _QuickActionItem(
+            icon: Icons.report_problem_rounded,
+            label: 'Incident Log',
+            color: Colors.redAccent,
+            onTap: () {
+              // TODO: Implement Incident Log Screen
+            },
+          ),
+          const SizedBox(width: 12),
+          _QuickActionItem(
+            icon: Icons.pie_chart_rounded,
+            label: 'Analytics',
+            color: Colors.purpleAccent,
+            onTap: () {
+              // Trigger navigation to Analytics tab in MainShell or push screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AnalyticsScreen()),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickActionItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback? onTap;
+
+  const _QuickActionItem({
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 100,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: Colors.white70,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -588,10 +732,15 @@ class _AlertCard extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, required this.subtitle});
+  const _SectionHeader({
+    required this.title,
+    required this.subtitle,
+    this.onAction,
+  });
 
   final String title;
   final String subtitle;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -607,6 +756,8 @@ class _SectionHeader extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 2),
               Text(
@@ -615,13 +766,18 @@ class _SectionHeader extends StatelessWidget {
                     .textTheme
                     .bodySmall
                     ?.copyWith(color: Colors.white70),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
         ),
         IconButton(
-          onPressed: () {},
-          icon: const Icon(Icons.tune_rounded, size: 20),
+          onPressed: onAction ?? () {},
+          icon: Icon(
+            onAction != null ? Icons.arrow_forward_ios_rounded : Icons.tune_rounded,
+            size: onAction != null ? 14 : 20,
+          ),
         ),
       ],
     );

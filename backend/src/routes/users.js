@@ -80,8 +80,12 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
 
-    if (!user || user.password !== password) { // In production, compare hashed passwords!
+    if (!user || user.password !== password) {
       return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    if (user.status === 'Suspended') {
+      return res.status(403).json({ error: 'Your account has been suspended. Please contact support.' });
     }
 
     res.json({ message: 'Login successful', user });

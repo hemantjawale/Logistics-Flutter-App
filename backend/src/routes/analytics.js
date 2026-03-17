@@ -1,5 +1,5 @@
 import express from 'express';
-import { Shipment, Vehicle, Payment } from '../models.js';
+import { Shipment, Vehicle, Payment, Expense } from '../models.js';
 
 const router = express.Router();
 
@@ -19,25 +19,34 @@ router.get('/summary', async (req, res) => {
       Vehicle.countDocuments({ health: 'Critical' }),
     ]);
 
-    const [totalPayments, pendingAmount, overdueAmount] = await Promise.all([
-      Payment.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]),
+    // Financial Overview
+    const [payments, expenses] = await Promise.all([
       Payment.aggregate([
-        { $match: { status: 'Pending' } },
-        { $group: { _id: null, total: { $sum: '$amount' } } },
+        { $group: { _id: '$status', total: { $sum: '$amount' }, count: { $addToSet: '$_id' } } }
       ]),
-      Payment.aggregate([
-        { $match: { status: 'Overdue' } },
-        { $group: { _id: null, total: { $sum: '$amount' } } },
-      ]),
+      Expense.aggregate([
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ])
     ]);
 
-    const totalAmount = totalPayments[0]?.total || 0;
-    const pending = pendingAmount[0]?.total || 0;
-    const overdue = overdueAmount[0]?.total || 0;
+    // Format payment split
+    const paymentMetrics = { received: 0, pending: 0, overdue: 0 };
+    payments.forEach(p => {
+      if (p._id === 'Paid') paymentMetrics.received = p.total;
+      if (p._id === 'Pending') paymentMetrics.pending = p.total;
+      if (p._id === 'Overdue') paymentMetrics.overdue = p.total;
+    });
 
-    const onTimeDelivery = totalShipments
-      ? delivered / totalShipments
-      : 0;
+    // Top Customers by Revenue
+    const topCustomers = await Payment.aggregate([
+      { $match: { status: 'Paid' } },
+      { $group: { _id: '$customerName', totalRevenue: { $sum: '$amount' } } },
+      { $sort: { totalRevenue: -1 } },
+      { $limit: 5 }
+    ]);
+
+    const totalRevenue = Object.values(paymentMetrics).reduce((a, b) => a + b, 0);
+    const totalExpense = expenses[0]?.total || 0;
 
     res.json({
       shipments: {
@@ -45,7 +54,7 @@ router.get('/summary', async (req, res) => {
         delivered,
         delayed,
         inTransit,
-        onTimeDelivery,
+        onTimeDelivery: totalShipments ? delivered / totalShipments : 0,
       },
       fleet: {
         total: totalVehicles,
@@ -53,10 +62,13 @@ router.get('/summary', async (req, res) => {
         critical: criticalVehicles,
       },
       payments: {
-        totalAmount,
-        pending,
-        overdue,
+        ...paymentMetrics,
+        totalRevenue,
       },
+      expenses: {
+        total: totalExpense,
+      },
+      topCustomers: topCustomers.map(c => ({ name: c._id, revenue: c.totalRevenue })),
     });
   } catch (err) {
     console.error(err);
@@ -65,3 +77,4 @@ router.get('/summary', async (req, res) => {
 });
 
 export default router;
+

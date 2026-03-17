@@ -53,6 +53,30 @@ router.post('/:id/complete', async (req, res) => {
   }
 });
 
+// REPORT INCIDENT
+router.post('/:id/incident', async (req, res) => {
+  try {
+    const { type, description, reportedBy } = req.body;
+    if (!type || !description) return res.status(400).json({ error: 'Type and description are required' });
+
+    const shipment = await Shipment.findById(req.params.id);
+    if (!shipment) return res.status(404).json({ error: 'Shipment not found' });
+
+    shipment.incidents.push({ type, description, reportedBy });
+    
+    // Automatically flag as Delayed if it's a breakdown or accident
+    if (type === 'Breakdown' || type === 'Accident') {
+      shipment.status = 'Delayed';
+    }
+
+    await shipment.save();
+    res.json({ message: 'Incident reported successfully', shipment });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to report incident' });
+  }
+});
+
 // CREATE shipment
 router.post('/', async (req, res) => {
   try {

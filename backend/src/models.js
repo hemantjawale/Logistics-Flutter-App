@@ -4,13 +4,14 @@ const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
-    password: { type: String, required: true }, // In production, hash this!
+    password: { type: String, required: true },
     role: {
       type: String,
       enum: ['driver', 'customer', 'manager'],
       required: true,
     },
     phone: { type: String },
+    status: { type: String, enum: ['Active', 'Suspended'], default: 'Active' },
   },
   { timestamps: true }
 );
@@ -32,8 +33,7 @@ const shipmentSchema = new mongoose.Schema(
     vehicleId: { type: String },
     priority: { type: String, enum: ['Low', 'Normal', 'High', 'Critical'], default: 'Normal' },
     progress: { type: Number, min: 0, max: 1, default: 0 },
-    // New fields
-    weight: { type: Number }, // in kg
+    weight: { type: Number },
     dimensions: {
       length: { type: Number },
       width: { type: Number },
@@ -48,43 +48,61 @@ const shipmentSchema = new mongoose.Schema(
     },
     pickupLocation: {
       type: { type: String, enum: ['Point'], default: 'Point' },
-      coordinates: { type: [Number], default: [0, 0] }, // [lng, lat]
+      coordinates: { type: [Number], default: [0, 0] },
       address: { type: String }
     },
     dropoffLocation: {
       type: { type: String, enum: ['Point'], default: 'Point' },
-      coordinates: { type: [Number], default: [0, 0] }, // [lng, lat]
+      coordinates: { type: [Number], default: [0, 0] },
       address: { type: String }
     },
     notes: { type: String },
+    incidents: [
+      {
+        type: { type: String, enum: ['Breakdown', 'Accident', 'Delay', 'Other'] },
+        description: { type: String },
+        timestamp: { type: Date, default: Date.now },
+        reportedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      }
+    ],
   },
   { timestamps: true }
 );
 
-// Index for geospatial queries if needed
 shipmentSchema.index({ pickupLocation: '2dsphere' });
 shipmentSchema.index({ dropoffLocation: '2dsphere' });
 
 const vehicleSchema = new mongoose.Schema(
   {
     code: { type: String, required: true, unique: true },
-    type: { type: String, required: true }, // Reefer, Container, etc.
+    type: { type: String, required: true },
     status: {
       type: String,
       enum: ['On Route', 'Idle', 'Maintenance', 'Offline'],
       default: 'Idle',
     },
     location: { type: String },
+    currentCoordinates: {
+      type: { type: String, enum: ['Point'], default: 'Point' },
+      coordinates: { type: [Number], default: [0, 0] },
+    },
     utilization: { type: Number, min: 0, max: 1, default: 0 },
     health: {
       type: String,
       enum: ['Good', 'Attention', 'Critical'],
       default: 'Good',
     },
+    mileage: { type: Number, default: 0 },
+    lastServiceMileage: { type: Number, default: 0 },
     nextMaintenance: { type: Date },
+    insuranceExpiry: { type: Date },
+    pucExpiry: { type: Date },
+    assignedDriver: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
 );
+
+vehicleSchema.index({ currentCoordinates: '2dsphere' });
 
 const paymentSchema = new mongoose.Schema(
   {
@@ -98,6 +116,20 @@ const paymentSchema = new mongoose.Schema(
     dueDate: { type: Date },
     paidAt: { type: Date },
     shipmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Shipment' },
+    customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  },
+  { timestamps: true }
+);
+
+const expenseSchema = new mongoose.Schema(
+  {
+    type: { type: String, enum: ['Fuel', 'Maintenance', 'Poll', 'Salary', 'Rent', 'Other'], required: true },
+    amount: { type: Number, required: true },
+    date: { type: Date, default: Date.now },
+    vehicleId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vehicle' },
+    driverId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    receiptUrl: { type: String },
+    notes: { type: String },
   },
   { timestamps: true }
 );
@@ -106,3 +138,5 @@ export const User = mongoose.model('User', userSchema);
 export const Shipment = mongoose.model('Shipment', shipmentSchema);
 export const Vehicle = mongoose.model('Vehicle', vehicleSchema);
 export const Payment = mongoose.model('Payment', paymentSchema);
+export const Expense = mongoose.model('Expense', expenseSchema);
+

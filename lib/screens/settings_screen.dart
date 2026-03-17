@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/user_session.dart';
 import '../services/api_client.dart';
 import 'landing_page.dart';
+import 'user_management_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -121,12 +122,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          ListTile(
-            leading: const Icon(Icons.lock_outline),
-            title: const Text('Change Password'),
-            trailing: const Icon(Icons.chevron_right),
             onTap: _changePassword,
           ),
+          if (_user!['role'] == 'manager') ...[
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.people_outline),
+              title: const Text('User Management'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const UserManagementScreen()),
+                );
+              },
+            ),
+          ],
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.redAccent),
