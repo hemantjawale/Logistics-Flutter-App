@@ -24,6 +24,7 @@ import fleetRouter from './routes/fleet.js';
 import paymentsRouter from './routes/payments.js';
 import analyticsRouter from './routes/analytics.js';
 import usersRouter from './routes/users.js';
+import aiRouter from './routes/ai.js';
 
 const app = express();
 
@@ -41,6 +42,7 @@ app.use('/api/fleet', fleetRouter);
 app.use('/api/payments', paymentsRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/ai', aiRouter);
 
 const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI;

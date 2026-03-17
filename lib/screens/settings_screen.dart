@@ -122,6 +122,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 20),
+          ListTile(
+            leading: const Icon(Icons.lock_outline),
+            title: const Text('Change Password'),
+            trailing: const Icon(Icons.chevron_right),
             onTap: _changePassword,
           ),
           if (_user!['role'] == 'manager') ...[

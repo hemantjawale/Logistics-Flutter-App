@@ -11,12 +11,30 @@ class AnalyticsScreen extends StatefulWidget {
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
   bool _isLoading = true;
+  bool _isAILoading = true;
   Map<String, dynamic>? _analytics;
+  List<dynamic> _aiInsights = [];
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _loadAIInsights();
+  }
+
+  Future<void> _loadAIInsights() async {
+    try {
+      final data = await ApiClient.fetchAIInsights();
+      if (mounted) {
+        setState(() {
+          _aiInsights = data['insights'] ?? [];
+          _isAILoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading AI insights: $e');
+      if (mounted) setState(() => _isAILoading = false);
+    }
   }
 
   Future<void> _loadData() async {
@@ -57,6 +75,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         Expanded(child: _buildTopCustomers()),
                       ],
                     ),
+                    const SizedBox(height: 24),
+                    _buildAIInsights(),
                     const SizedBox(height: 100), // Bottom padding for footer
                   ],
                 ),
@@ -281,6 +301,69 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         children: [
           Text(label, style: const TextStyle(color: Colors.white54, fontSize: 10)),
           Text(value, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAIInsights() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.auto_awesome_rounded, color: Colors.purpleAccent, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'AI Insights Hub',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const Spacer(),
+            if (_isAILoading)
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.purpleAccent),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (_aiInsights.isEmpty && !_isAILoading)
+          const Text('Analyzing current data for insights...', style: TextStyle(color: Colors.white54, fontSize: 13))
+        else
+          ..._aiInsights.map((insight) => _insightCard(insight)).toList(),
+      ],
+    );
+  }
+
+  Widget _insightCard(Map<String, dynamic> insight) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.purpleAccent.withOpacity(0.05),
+            Colors.indigoAccent.withOpacity(0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.purpleAccent.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            insight['title'] ?? 'Strategic Insight',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.purpleAccent),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            insight['description'] ?? '',
+            style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+          ),
         ],
       ),
     );

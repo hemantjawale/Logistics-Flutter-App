@@ -139,6 +139,15 @@ class ApiClient {
     _handleResponse(response);
   }
 
+  static Future<void> reportIncident(String shipmentId, Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/shipments/$shipmentId/incident'),
+      headers: await _getHeaders(),
+      body: jsonEncode(data),
+    );
+    _handleResponse(response);
+  }
+
   // Fleet Methods
   static Future<List<Map<String, dynamic>>> fetchFleet() async {
     final response = await http.get(Uri.parse('$baseUrl/fleet'), headers: await _getHeaders());
@@ -159,6 +168,15 @@ class ApiClient {
     final response = await http.delete(
       Uri.parse('$baseUrl/fleet/$id'),
       headers: await _getHeaders(),
+    );
+    _handleResponse(response);
+  }
+
+  static Future<void> updateVehicleLocation(String vehicleId, double lat, double lng) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/fleet/$vehicleId/location'),
+      headers: await _getHeaders(),
+      body: jsonEncode({'lat': lat, 'lng': lng}),
     );
     _handleResponse(response);
   }
@@ -204,6 +222,17 @@ class ApiClient {
       headers: await _getHeaders(),
       body: jsonEncode(data),
     );
+    return Map<String, dynamic>.from(_handleResponse(response));
+  }
+
+  // AI Methods
+  static Future<Map<String, dynamic>> fetchAIInsights() async {
+    final response = await http.get(Uri.parse('$baseUrl/ai/insights'), headers: await _getHeaders());
+    return Map<String, dynamic>.from(_handleResponse(response));
+  }
+
+  static Future<Map<String, dynamic>> predictDelay(String shipmentId) async {
+    final response = await http.get(Uri.parse('$baseUrl/ai/predict-delay/$shipmentId'), headers: await _getHeaders());
     return Map<String, dynamic>.from(_handleResponse(response));
   }
 }

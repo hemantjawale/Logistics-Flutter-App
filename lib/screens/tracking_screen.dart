@@ -3,21 +3,50 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/api_client.dart';
 
-class TrackingScreen extends StatelessWidget {
+class TrackingScreen extends StatefulWidget {
   final Map<String, dynamic> shipment;
 
   const TrackingScreen({super.key, required this.shipment});
 
   @override
+  State<TrackingScreen> createState() => _TrackingScreenState();
+}
+
+class _TrackingScreenState extends State<TrackingScreen> {
+  Map<String, dynamic>? _prediction;
+  bool _isPredicting = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _getPrediction();
+  }
+
+  Future<void> _getPrediction() async {
+    try {
+      final res = await ApiClient.predictDelay(widget.shipment['_id']);
+      if (mounted) {
+        setState(() {
+          _prediction = res;
+          _isPredicting = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isPredicting = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final eta = shipment['eta'] != null 
-        ? DateTime.parse(shipment['eta']).difference(DateTime.now()).inMinutes 
+    final eta = widget.shipment['eta'] != null 
+        ? DateTime.parse(widget.shipment['eta']).difference(DateTime.now()).inMinutes 
         : 0;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Track ${shipment['trackingNumber']}'),
+        title: Text('Track ${widget.shipment['trackingNumber']}'),
         backgroundColor: Colors.transparent,
       ),
       body: SingleChildScrollView(
@@ -45,13 +74,12 @@ class TrackingScreen extends StatelessWidget {
                     const Icon(Icons.map, size: 48, color: Colors.white54),
                     const SizedBox(height: 8),
                     const Text('Live Tracking Map', style: TextStyle(color: Colors.white)),
-                    if (shipment['status'] == 'In Transit')
+                    if (widget.shipment['status'] == 'In Transit')
                       Padding(
                         padding: const EdgeInsets.all(8.0),
                         child: ElevatedButton.icon(
                           onPressed: () {
-                             // Mock Lat/Lng for demo
-                             _launchMaps(28.7041, 77.1025); // Delhi
+                             _launchMaps(28.7041, 77.1025); 
                           },
                           icon: const Icon(Icons.navigation),
                           label: const Text('Open in Google Maps'),
@@ -63,6 +91,10 @@ class TrackingScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             
+            // AI Prediction Card
+            _buildAIAlert(),
+            const SizedBox(height: 16),
+
             // ETA Card
             Container(
               padding: const EdgeInsets.all(16),
@@ -83,14 +115,13 @@ class TrackingScreen extends StatelessWidget {
                         style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
-                      // Last Seen / Offline Handling
                       Row(
                         children: [
-                          Icon(Icons.circle, size: 10, color: (shipment['lastUpdated'] != null && DateTime.now().difference(DateTime.parse(shipment['lastUpdated'])).inMinutes < 15) ? Colors.green : Colors.red),
+                          Icon(Icons.circle, size: 10, color: (widget.shipment['lastUpdated'] != null && DateTime.now().difference(DateTime.parse(widget.shipment['lastUpdated'])).inMinutes < 15) ? Colors.green : Colors.red),
                           const SizedBox(width: 6),
                           Text(
-                            (shipment['lastUpdated'] != null && DateTime.now().difference(DateTime.parse(shipment['lastUpdated'])).inMinutes > 15) 
-                              ? 'Driver Offline (Last seen ${DateTime.now().difference(DateTime.parse(shipment['lastUpdated'])).inMinutes}m ago)' 
+                            (widget.shipment['lastUpdated'] != null && DateTime.now().difference(DateTime.parse(widget.shipment['lastUpdated'])).inMinutes > 15) 
+                              ? 'Driver Offline' 
                               : 'Driver Online',
                             style: const TextStyle(color: Colors.white54, fontSize: 12),
                           ),
@@ -104,11 +135,11 @@ class TrackingScreen extends StatelessWidget {
             const SizedBox(height: 20),
 
             // Driver Info
-            if (shipment['driverName'] != null)
+            if (widget.shipment['driverName'] != null)
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const CircleAvatar(child: Icon(Icons.person)),
-                title: Text(shipment['driverName'], style: const TextStyle(color: Colors.white)),
+                title: Text(widget.shipment['driverName'], style: const TextStyle(color: Colors.white)),
                 subtitle: const Text('Assigned Driver', style: TextStyle(color: Colors.white54)),
                 trailing: IconButton(
                   icon: const Icon(Icons.phone, color: Colors.green),
@@ -127,17 +158,72 @@ class TrackingScreen extends StatelessWidget {
                 ActionChip(
                   avatar: const Icon(Icons.picture_as_pdf, size: 16),
                   label: const Text('Download Invoice'),
-                  onPressed: () => _generateInvoice(context, shipment),
+                  onPressed: () => _generateInvoice(context, widget.shipment),
                 ),
                 ActionChip(
                   avatar: const Icon(Icons.description, size: 16),
                   label: const Text('Dispatch Manifest'),
-                  onPressed: () => _generateManifest(context, shipment),
+                  onPressed: () => _generateManifest(context, widget.shipment),
                 ),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAIAlert() {
+    if (_isPredicting) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.purpleAccent.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Row(
+          children: [
+            SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+            SizedBox(width: 12),
+            Text('AI Analyzing shipment for delay risks...', style: TextStyle(fontSize: 12, color: Colors.white60)),
+          ],
+        ),
+      );
+    }
+
+    if (_prediction == null) return const SizedBox();
+
+    final prob = _prediction!['probability'] ?? 0;
+    final isHighRisk = prob > 40;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isHighRisk ? Colors.redAccent.withOpacity(0.1) : Colors.greenAccent.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isHighRisk ? Colors.redAccent.withOpacity(0.3) : Colors.greenAccent.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(isHighRisk ? Icons.auto_graph_rounded : Icons.auto_awesome_rounded, 
+               color: isHighRisk ? Colors.redAccent : Colors.greenAccent),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isHighRisk ? 'AI Delay Risk: $prob%' : 'On-Time Probability: ${100-prob}%',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: isHighRisk ? Colors.redAccent : Colors.greenAccent),
+                ),
+                Text(
+                  _prediction!['reason'] ?? 'Normal shipment flow detected.',
+                  style: const TextStyle(fontSize: 12, color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -151,7 +237,6 @@ class TrackingScreen extends StatelessWidget {
 
   Future<void> _generateInvoice(BuildContext context, Map<String, dynamic> data) async {
     final pdf = pw.Document();
-
     pdf.addPage(
       pw.Page(
         build: (pw.Context context) {
@@ -186,15 +271,11 @@ class TrackingScreen extends StatelessWidget {
         },
       ),
     );
-
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-    );
+    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
   }
 
   Future<void> _generateManifest(BuildContext context, Map<String, dynamic> data) async {
     final pdf = pw.Document();
-    
     pdf.addPage(
       pw.Page(
         build: (pw.Context context) {
@@ -209,15 +290,11 @@ class TrackingScreen extends StatelessWidget {
               pw.SizedBox(height: 20),
               pw.Text('Goods Description:'),
               pw.Text('Weight: ${data['weight']} kg'),
-              pw.Text('Dims: ${data['dimensions']?['length']}x${data['dimensions']?['width']}x${data['dimensions']?['height']} cm'),
             ],
           );
         },
       ),
     );
-
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-    );
+    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
   }
 }

@@ -24,29 +24,22 @@ Future<void> _checkAndSendLocation() async {
     // Condition 1: Battery below 15%
     bool isLowBattery = batteryLevel < 15;
     
-    // Condition 2: Regular 30-min update (Handled by Workmanager interval)
-    // But we can force it here if we want to add extra logic
-    
     Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
     
     // Send to backend
-    // Assuming we have a way to identify the user/device.
-    // In background, UserSession might not be available or persistent in the same way.
-    // We might need to store token/ID in shared prefs accessible here.
-    // For now, let's assume we can get the driver ID or use a generic update endpoint.
-    
-    // Since we are in a background isolate, we need to be careful with dependencies.
-    // ApiClient might need initialization or token.
-    
-    // For simplicity in this demo, we will just print/log.
-    // In production: await ApiClient.updateDriverLocation(driverId, position, batteryLevel);
+    final user = await UserSession.getUser();
+    if (user != null && user['role'] == 'driver') {
+      final vehicleId = user['assignedVehicleId'];
+      if (vehicleId != null) {
+        await ApiClient.updateVehicleLocation(vehicleId, position.latitude, position.longitude);
+        print("Background Task: Updated location for vehicle $vehicleId");
+      }
+    }
     
     print("Background Task: Battery $batteryLevel%, Location: ${position.latitude}, ${position.longitude}");
     
     if (isLowBattery) {
-      // Trigger "Urgent" update
       print("CRITICAL: Low Battery! Sending emergency location update.");
-      // ApiClient.sendEmergencyAlert(...)
     }
 
   } catch (e) {

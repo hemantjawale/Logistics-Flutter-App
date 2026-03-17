@@ -568,6 +568,15 @@ class _QuickActionsRow extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           _QuickActionItem(
+            icon: Icons.auto_mode_rounded,
+            label: 'AI Smart Assign',
+            color: Colors.indigoAccent,
+            onTap: () {
+              // TODO: Implement AI Smart Assignment Algorithm
+            },
+          ),
+          const SizedBox(width: 12),
+          _QuickActionItem(
             icon: Icons.pie_chart_rounded,
             label: 'Analytics',
             color: Colors.purpleAccent,
